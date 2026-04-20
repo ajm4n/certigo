@@ -304,7 +304,7 @@ func sendAS(cfg *config.Config, realm string, reqBytes []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("pkinit: dial KDC %s: %w", addr, err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	_ = conn.SetDeadline(time.Now().Add(15 * time.Second))
 
 	hdr := make([]byte, 4)

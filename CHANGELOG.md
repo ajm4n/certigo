@@ -6,6 +6,33 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-04-20
+
+### All 12 Certipy subcommands now have real working implementations.
+
+### Added — PKINIT end-to-end
+- `internal/auth/pkinit/papkreq.go` — PA-PK-AS-REQ / PA-PK-AS-REP ASN.1 wrapper + parser for the DH-info path.
+- `internal/auth/pkinit/keyderiv.go` — RFC 4556 §3.2.3.1 octetstring2key with nonce support.
+- `internal/auth/pkinit/asreq.go` — end-to-end `AuthenticateWithPKINIT` / `AuthenticateWithPKINITResult`. Raw TCP AS-REQ sender. AS-REP decryption via `crypto.DecryptEncPart`.
+- `internal/auth/pkinit/ccache.go` — `SavePKINITTGTToCCache` (MIT ccache v4 writer).
+- **`certigo auth --pfx`** now performs a live PKINIT AS-REQ and writes the TGT to ccache.
+
+### Added — NTLM relay MITM
+- `internal/relay/relay.go` — full HTTP(S) listener with NTLM NEGOTIATE/CHALLENGE/AUTHENTICATE forwarding to AD CS `/certsrv/`. On successful relay: generates RSA-2048 key + CSR, POSTs to `/certsrv/certfnsh.asp`, fetches the issued cert via `/certsrv/certnew.cer?ReqID=<id>&Enc=b64`, saves PFX under `OutDir/<victim>.pfx`.
+- Per-victim cookie jar keeps target-side session state across round-trips. Session TTL 60s.
+- `relay_test.go` — health / 401 / NEGOTIATE-forwarding tests.
+
+### Added — ICertAdminD / ICertAdminD2 DCOM
+- `internal/ca/rpc.go` + `internal/ca/ops.go` — DCOM activation via `IActivation::RemoteActivation`, IPID plumbed into CertAdminD + CertAdminD2 clients.
+- **`certigo ca --backup`**: real RPC via `GetCAProperty(CR_PROP_CASIGCERT)`, emits PEM (public-key-only; full private-key backup still requires multi-step BackupPrepare/OpenFile/ReadFile flow, documented in-code).
+- **`certigo ca --issue-request` / `--deny-request`**: live `ResubmitRequest` / `DenyRequest`.
+- **`certigo ca --add-officer` / `--remove-officer`**: Get→edit (self-relative SD with SID encoder)→Set round-trip via `GetOfficerRights` / `SetOfficerRights`.
+- `ca_test.go` — 11 tests covering empty-server, error paths, SID round-trips, DACL add/remove, username splitting.
+
+### Stats
+- **144 tests passing** across **22 Go packages**.
+- **All 12 subcommands** do real work. Every remaining "not yet implemented" pointer documents a specific external requirement (e.g., EVTX needs a pure-Go parser; private-key CA backup needs BackupPrepare streaming).
+
 ## [0.4.0] - 2026-04-20
 
 ### Added — real RPC integrations

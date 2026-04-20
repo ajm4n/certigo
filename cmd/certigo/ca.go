@@ -252,4 +252,3 @@ func runCARPC(f *caFlags, conn *goldapConn, configNC string, creds *auth.Credent
 	}
 	return nil
 }
-
