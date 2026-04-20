@@ -23,10 +23,10 @@ type caFlags struct {
 	listTpl      bool
 	listOfficers bool
 
-	backup       bool
-	issueRequest int
-	denyRequest  int
-	addOfficer   string
+	backup        bool
+	issueRequest  int
+	denyRequest   int
+	addOfficer    string
 	removeOfficer string
 }
 
