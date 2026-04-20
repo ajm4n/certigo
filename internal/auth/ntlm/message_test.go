@@ -39,7 +39,7 @@ func TestChallengeMessageDecode(t *testing.T) {
 	payload = append(payload, make([]byte, 8)...) // reserved
 	payload = append(payload, u16(uint16(len(tiBytes)))...)
 	payload = append(payload, u16(uint16(len(tiBytes)))...)
-	payload = append(payload, u32(56)...) // offset
+	payload = append(payload, u32(56)...)         // offset
 	payload = append(payload, make([]byte, 8)...) // version
 	payload = append(payload, tiBytes...)
 

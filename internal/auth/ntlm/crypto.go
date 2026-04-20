@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"strings"
 
+	//lint:ignore SA1019 MD4 is required for the NT hash per MS-NLMP; no replacement exists.
 	"golang.org/x/crypto/md4"
 )
 
