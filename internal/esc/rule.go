@@ -28,6 +28,14 @@ func AllRules() []Rule {
 		ESC5{},
 		ESC6{},
 		ESC7{},
+		ESC8{},
+		ESC9{},
+		ESC10{},
+		ESC11{},
+		ESC13{},
+		ESC14{},
+		ESC15{},
+		ESC16{},
 	}
 }
 
