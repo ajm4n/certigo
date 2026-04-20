@@ -6,6 +6,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-20
+
+### Added — real RPC integrations
+- **`req --method rpc`** — full MS-ICPR `CertServerRequest` over DCE/RPC with SPNEGO auth (`internal/req/rpc.go`). Issues live certs from any AD CS Enterprise CA reachable over 135/dynamic.
+- **`relay --trigger petitpotam`** — MS-EFSR `EfsRpcOpenFileRaw` coercion (`internal/coerce/coerce.go`).
+- **`relay --trigger dfscoerce`** — MS-DFSNM `NetrDfsRemoveStdRoot` coercion.
+- **`relay --trigger printerbug`** — MS-RPRN `RpcOpenPrinter` + `RemoteFindFirstPrinterChangeNotification` (SpoolSample).
+- **`parse --file *.reg`** — real Windows Registry text-dump parser with section + key/value + multi-line hex continuation handling (`internal/parse/parse.go`).
+- **`ptt --kirbi`** — kirbi-to-ccache conversion via `krb.KirbiToCCacheBytes`; output file is a drop-in `$KRB5CCNAME`.
+
+### Remaining gaps (future work)
+- `auth --pfx` PKINIT AS-REQ wire integration with gokrb5 internals.
+- `ca --backup/--issue/--deny/--add-officer/--remove-officer` (ICertAdminD2 is DCOM — needs IRemoteSCMActivator activation flow).
+- `relay` full NTLM-forwarding pipeline (victim session → outbound `/certsrv/` MITM).
+- `parse --file *.evtx` (no pure-Go EVTX library adopted yet).
+
 ## [0.3.0] - 2026-04-20
 
 ### Added
