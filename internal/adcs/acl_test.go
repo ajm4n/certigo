@@ -10,11 +10,11 @@ import (
 func buildSIDBuiltinAdmins() []byte {
 	// Revision(1) + SubAuthCount(1) + Authority(6, big-endian) + 2 x SubAuth(4, LE)
 	sid := make([]byte, 2+6+4*2)
-	sid[0] = 1                      // revision
-	sid[1] = 2                      // sub-authority count
-	sid[2], sid[3] = 0, 0           // authority high bytes (=0)
-	sid[4], sid[5] = 0, 0           // authority (big-endian) — value 5 lives in bytes 6-7
-	sid[6], sid[7] = 0, 5           // identifier authority = 5
+	sid[0] = 1                                     // revision
+	sid[1] = 2                                     // sub-authority count
+	sid[2], sid[3] = 0, 0                          // authority high bytes (=0)
+	sid[4], sid[5] = 0, 0                          // authority (big-endian) — value 5 lives in bytes 6-7
+	sid[6], sid[7] = 0, 5                          // identifier authority = 5
 	binary.LittleEndian.PutUint32(sid[8:12], 32)   // sub-authority 0 = BUILTIN
 	binary.LittleEndian.PutUint32(sid[12:16], 544) // sub-authority 1 = Administrators
 	return sid

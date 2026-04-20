@@ -102,7 +102,7 @@ func TestParseTemplate_Fields(t *testing.T) {
 			// 0x00000001 = CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT
 			AttrPKICertificateNameFlag: {"1"},
 			// 0x00000002 = CT_FLAG_PEND_ALL_REQUESTS (manager approval)
-			AttrPKIEnrollmentFlag:  {"2"},
+			AttrPKIEnrollmentFlag: {"2"},
 			AttrPKIPrivateKeyFlag: {"16"},
 		},
 		map[string][][]byte{

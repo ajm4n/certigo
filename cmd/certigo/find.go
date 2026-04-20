@@ -84,7 +84,7 @@ func runFind(f *findFlags) error {
 	if err != nil {
 		return fmt.Errorf("find: ldap dial: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	spn := ""
 	if creds.UseKerberos {
@@ -122,7 +122,7 @@ func runFind(f *findFlags) error {
 		if err != nil {
 			return fmt.Errorf("find: open output: %w", err)
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 		w = file
 	}
 

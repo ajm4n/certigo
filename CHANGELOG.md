@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-04-20
+
+### Added
+- **`certigo find`** — first end-to-end user-facing subcommand. Enumerates AD CS CAs and templates via LDAP, runs ESC1-16 detection, renders output in four formats.
+- `internal/adcs` — LDAP enumeration of pKIEnrollmentService + pKICertificateTemplate with attribute parsing (ms-PKI flags, validity/renewal FILETIME deltas) and nTSecurityDescriptor ACE extraction.
+- `internal/esc` — ESC1 through ESC11 + ESC13-16 detection rules. Each rule is a pluggable `Rule` implementation with its own file. ESC5/8-11/13-16 tagged as "probe-dependent" where runtime info is missing.
+- `internal/output` — four formatters: `text` (Certipy-style section layout), `json` (snake_case structured), `zip` (bundle with per-CA certs + per-template JSON), `bloodhound` (BloodHound CE OpenGraph edges / nodes, ADCSESC1..16 kinds).
+
+### Changed
+- `cmd/certigo/find.go` upgraded from stub to full orchestrator wiring auth, LDAP, adcs, esc, and output.
+
 ## [0.1.0-alpha3] - 2026-04-20
 
 ### Added
