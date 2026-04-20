@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt lab parity clean help
+.PHONY: build test lint fmt lab lab-up lab-down lab-destroy lab-logs parity clean help
 
 BINARY  := certigo
 PKG     := github.com/ajm4n/certigo
@@ -21,11 +21,22 @@ fmt: ## format all Go code
 	gofmt -w .
 	goimports -w . 2>/dev/null || true
 
-lab: ## spin up local ad+adcs lab (placeholder until M2)
-	@echo "lab: not yet implemented (planned for M2+)"
+lab: lab-up ## spin up local ad+adcs lab
 
 parity: ## run certipy-vs-certigo parity diff (placeholder until M2)
 	@echo "parity: not yet implemented (planned for M2+)"
 
 clean: ## remove built artifacts
 	rm -rf $(BINARY) dist/
+
+lab-up: ## start local docker lab (samba-ad-dc + mock-adcs)
+	cd lab/docker && docker compose up -d
+
+lab-down: ## stop and remove local docker lab (preserves volumes)
+	cd lab/docker && docker compose down
+
+lab-destroy: ## stop lab and purge volumes
+	cd lab/docker && docker compose down -v
+
+lab-logs: ## tail all lab logs
+	cd lab/docker && docker compose logs -f
