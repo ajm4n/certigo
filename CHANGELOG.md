@@ -6,6 +6,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-20
+
+### Added
+- **`certigo cert`** — PFX ↔ PEM conversion, extract-key, extract-cert with password pass-through.
+- **`certigo forge`** — CA-signed certificate forging (Golden Certificate) with NTDS-CA-Security-Ext SID binding, UPN SAN, DNS SAN, certificatePolicies, CRL distribution.
+- **`certigo shadow`** — msDS-KeyCredentialLink CRUD (add/list/info/clear/remove) with PFX export for follow-up PKINIT.
+- **`certigo template`** — LDAP template read/write/backup/restore + ESC4 make-vulnerable preset.
+- **`certigo account`** — AD user/computer create/update/delete/read via LDAP with SPN/UPN/dNSHostName support.
+- **`certigo auth`** — password + NT-hash AS-REQ to obtain a TGT and write it to ccache. PKINIT path partially implemented (DH + CMS + AuthPack library in `internal/auth/pkinit/`; final AS-REQ wire integration pending).
+- **`certigo ptt`** — ticket pass-through: reads kirbi or ccache, writes to `$KRB5CCNAME` or `--out-ccache`. Full kirbi→ccache conversion pending; kirbi→kirbi and ccache→ccache work end-to-end.
+- **`certigo parse`** — returns explicit `not-yet-implemented` errors for `.evtx` / `.reg` pending a pure-Go parser; documented rollback to Certipy for these artifacts.
+
+### Internal libraries shipped
+- `internal/auth/pkinit` — OIDs, DH primitives (OAKLEY Group 2 + RFC 3526 Group 14), AuthPack encoder, CMS SignedData builder/parser.
+- `internal/forge` — NTDS-CA-Security-Ext, UPN SAN, certificate policies, CRL extensions, `Forge()`.
+- `internal/shadow` — KeyCredential blob codec, BCRYPT_RSAKEY_BLOB codec, DNBinary wire format, LDAP add/list/clear/remove actions.
+- `internal/template` — LDAP read/write/backup/restore; ESC4 `VulnerableAttrs()` preset.
+- `internal/account` — LDAP create/update/delete/read, DN resolver, UTF-16LE unicodePwd encoder.
+- `internal/certcmd` — PFX↔PEM converter engine.
+
+### Not yet shipped (M4/M5/M7)
+- `certigo ca` — ICertAdminD2 RPC bindings (backup CA, issue/deny request, officer CRUD).
+- `certigo req` — web enrollment and ICPR RPC submission.
+- `certigo relay` — HTTP listener, NTLM relay to `/certsrv/`, coercion triggers (PetitPotam, DFSCoerce, PrinterBug).
+
 ## [0.1.0] - 2026-04-20
 
 ### Added
