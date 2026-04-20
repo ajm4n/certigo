@@ -1,6 +1,6 @@
 module github.com/ajm4n/certigo
 
-go 1.24.0
+go 1.24.1
 
 require (
 	github.com/go-ldap/ldap/v3 v3.4.13
@@ -22,6 +22,7 @@ require (
 	github.com/jcmturner/dnsutils/v2 v2.0.0 // indirect
 	github.com/jcmturner/goidentity/v6 v6.0.1 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
+	github.com/oiweiwei/go-msrpc v1.2.18 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	golang.org/x/net v0.50.0 // indirect
 )
