@@ -1,0 +1,24 @@
+# Binaries
+/certigo
+/certigo.exe
+/dist/
+
+# Go build caches
+*.test
+*.out
+coverage.txt
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local env
+.env
+.envrc
+
+# Lab fixtures (generated)
+/test/fixtures/local/
+/lab/vm/output-*/
