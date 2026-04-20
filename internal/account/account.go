@@ -20,10 +20,10 @@ const (
 // userAccountControl flag values used by Create/Update.
 const (
 	uacAccountDisable        = 0x0002
-	uacNormalAccount         = 0x0200 // 512
-	uacWorkstationTrust      = 0x1000 // 4096
-	uacNormalAccountEnabled  = uacNormalAccount                          // 512
-	uacNormalAccountDisabled = uacNormalAccount | uacAccountDisable      // 514
+	uacNormalAccount         = 0x0200                               // 512
+	uacWorkstationTrust      = 0x1000                               // 4096
+	uacNormalAccountEnabled  = uacNormalAccount                     // 512
+	uacNormalAccountDisabled = uacNormalAccount | uacAccountDisable // 514
 )
 
 // Options bundles every knob the account package needs. Not all fields are
@@ -235,13 +235,13 @@ func Read(opts Options) (map[string][]string, error) {
 // under BaseDN for a matching sAMAccountName.
 func targetDN(opts Options) (string, error) {
 	if opts.Target == "" {
-		return "", fmt.Errorf("Target required")
+		return "", fmt.Errorf("account: target required")
 	}
 	if strings.Contains(opts.Target, ",") {
 		return opts.Target, nil
 	}
 	if opts.BaseDN == "" {
-		return "", fmt.Errorf("BaseDN required to resolve sAMAccountName")
+		return "", fmt.Errorf("account: base DN required to resolve sAMAccountName")
 	}
 	return ResolveDN(opts.Conn, opts.BaseDN, opts.Target)
 }

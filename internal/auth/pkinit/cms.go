@@ -27,9 +27,9 @@ type signedData struct {
 	Version          int
 	DigestAlgorithms []algorithmIdentifier `asn1:"set"`
 	EncapContentInfo encapContentInfo
-	Certificates     asn1.RawValue        `asn1:"optional,tag:0"`
-	CRLs             asn1.RawValue        `asn1:"optional,tag:1"`
-	SignerInfos      []signerInfo         `asn1:"set"`
+	Certificates     asn1.RawValue `asn1:"optional,tag:0"`
+	CRLs             asn1.RawValue `asn1:"optional,tag:1"`
+	SignerInfos      []signerInfo  `asn1:"set"`
 }
 
 // encapContentInfo is RFC 5652 §5.2 EncapsulatedContentInfo. The eContent

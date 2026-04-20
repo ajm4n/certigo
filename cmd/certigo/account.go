@@ -26,14 +26,14 @@ type accountFlags struct {
 	baseDN   string
 
 	// Action.
-	action     string
-	target     string
-	accType    string
-	acctPwd    string
-	spns       []string
-	upn        string
-	dnsHost    string
-	container  string
+	action    string
+	target    string
+	accType   string
+	acctPwd   string
+	spns      []string
+	upn       string
+	dnsHost   string
+	container string
 }
 
 func newAccountCmd() *cobra.Command {
@@ -161,19 +161,19 @@ func runAccount(cmd *cobra.Command, f *accountFlags) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "created: %s\n", dn)
+		_, _ = fmt.Fprintf(out, "created: %s\n", dn)
 
 	case "update":
 		if err := account.Update(opts); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "updated: %s\n", f.target)
+		_, _ = fmt.Fprintf(out, "updated: %s\n", f.target)
 
 	case "delete":
 		if err := account.Delete(opts); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "deleted: %s\n", f.target)
+		_, _ = fmt.Fprintf(out, "deleted: %s\n", f.target)
 
 	case "read":
 		attrs, err := account.Read(opts)
@@ -187,7 +187,7 @@ func runAccount(cmd *cobra.Command, f *accountFlags) error {
 		sort.Strings(keys)
 		for _, k := range keys {
 			for _, v := range attrs[k] {
-				fmt.Fprintf(out, "%s: %s\n", k, v)
+				_, _ = fmt.Fprintf(out, "%s: %s\n", k, v)
 			}
 		}
 	}

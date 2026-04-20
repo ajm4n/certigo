@@ -16,10 +16,10 @@ import (
 // pkAuthenticator wraps the four time-and-identity fields that the KDC
 // chains into the AS reply's nonce (RFC 4556 §3.2.1).
 type pkAuthenticator struct {
-	CUSec      int          `asn1:"explicit,tag:0"`
-	CTime      time.Time    `asn1:"generalized,explicit,tag:1"`
-	Nonce      int32        `asn1:"explicit,tag:2"`
-	PAChecksum []byte       `asn1:"explicit,optional,tag:3"`
+	CUSec      int       `asn1:"explicit,tag:0"`
+	CTime      time.Time `asn1:"generalized,explicit,tag:1"`
+	Nonce      int32     `asn1:"explicit,tag:2"`
+	PAChecksum []byte    `asn1:"explicit,optional,tag:3"`
 }
 
 // subjectPublicKeyInfo wraps the DH parameters + Y public value in the
@@ -40,10 +40,10 @@ type dhDomainParameters struct {
 // authPack is the RFC 4556 §3.2.1 AuthPack — exactly the payload wrapped in
 // CMS SignedData and inserted into the PA-PK-AS-REQ.
 type authPack struct {
-	PKAuthenticator    pkAuthenticator        `asn1:"explicit,tag:0"`
-	ClientPublicValue  subjectPublicKeyInfo   `asn1:"explicit,optional,tag:1"`
-	SupportedCMSTypes  []algorithmIdentifier  `asn1:"explicit,optional,tag:2"`
-	ClientDHNonce      []byte                 `asn1:"explicit,optional,tag:3"`
+	PKAuthenticator   pkAuthenticator       `asn1:"explicit,tag:0"`
+	ClientPublicValue subjectPublicKeyInfo  `asn1:"explicit,optional,tag:1"`
+	SupportedCMSTypes []algorithmIdentifier `asn1:"explicit,optional,tag:2"`
+	ClientDHNonce     []byte                `asn1:"explicit,optional,tag:3"`
 }
 
 // BuildAuthPack serializes an AuthPack for a PA-PK-AS-REQ. paChecksum MUST

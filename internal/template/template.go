@@ -62,17 +62,18 @@ func TemplateDN(configNC, name string) string {
 // no-security-extension, client-auth EKUs, zero authorised signatures.
 //
 // Flag decoding for msPKI-Certificate-Name-Flag -1509949440 (int32):
-//   bit 0x00000001  CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT
-//   bit 0x00010000  CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT_ALT_NAME
-//   bit 0x80000000  CT_FLAG_NO_SECURITY_EXTENSION
+//
+//	bit 0x00000001  CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT
+//	bit 0x00010000  CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT_ALT_NAME
+//	bit 0x80000000  CT_FLAG_NO_SECURITY_EXTENSION
 func VulnerableAttrs() map[string][]string {
 	return map[string][]string{
 		"msPKI-Certificate-Name-Flag": {"-1509949440"},
 		"msPKI-Enrollment-Flag":       {"0"},
 		"pKIExtendedKeyUsage": {
-			"1.3.6.1.5.5.7.3.2",       // TLS Web Client Authentication
-			"1.3.6.1.5.2.3.4",         // PKINIT Client Authentication
-			"1.3.6.1.4.1.311.20.2.2",  // Smart Card Logon
+			"1.3.6.1.5.5.7.3.2",      // TLS Web Client Authentication
+			"1.3.6.1.5.2.3.4",        // PKINIT Client Authentication
+			"1.3.6.1.4.1.311.20.2.2", // Smart Card Logon
 		},
 		"msPKI-RA-Signature":            {"0"},
 		"msPKI-Template-Schema-Version": {"2"},

@@ -15,15 +15,15 @@ import (
 
 // KeyCredential entry identifiers per MS-KPP §2.2.2.
 const (
-	entryKeyID                             byte = 0x01
-	entryKeyHash                           byte = 0x02
-	entryKeyMaterial                       byte = 0x03
-	entryKeyUsage                          byte = 0x04
-	entryKeySource                         byte = 0x05
-	entryDeviceID                          byte = 0x06
-	entryCustomKeyInformation              byte = 0x07
-	entryKeyApproximateLastLogonTimeStamp  byte = 0x08
-	entryKeyCreationTime                   byte = 0x09
+	entryKeyID                            byte = 0x01
+	entryKeyHash                          byte = 0x02
+	entryKeyMaterial                      byte = 0x03
+	entryKeyUsage                         byte = 0x04
+	entryKeySource                        byte = 0x05
+	entryDeviceID                         byte = 0x06
+	entryCustomKeyInformation             byte = 0x07
+	entryKeyApproximateLastLogonTimeStamp byte = 0x08
+	entryKeyCreationTime                  byte = 0x09
 )
 
 // Version 2 is the only version used in AD (Windows 10/Server 2016+).
