@@ -1,20 +1,16 @@
 // Package ca exposes LDAP-backed management operations for AD CS CAs
-// (pKIEnrollmentService objects). RPC (ICertAdminD2) operations are
-// stubbed pending go-msrpc integration.
+// (pKIEnrollmentService objects) plus DCOM / MS-CSRA (ICertAdminD +
+// ICertAdminD2) client bindings for Backup, request approval / denial,
+// and Officer-rights management. See rpc.go / ops.go for the RPC side.
 package ca
 
 import (
-	"errors"
 	"fmt"
 
 	goldap "github.com/go-ldap/ldap/v3"
 
 	"github.com/ajm4n/certigo/internal/adcs"
 )
-
-// ErrRPCUnimplemented is returned by RPC-backed helpers until go-msrpc
-// provides usable bindings for MS-CSRA / ICertAdminD2.
-var ErrRPCUnimplemented = errors.New("ca: ICertAdminD2 RPC not yet implemented")
 
 // caDN returns the pKIEnrollmentService object's DN for a given CA name.
 func caDN(configNC, name string) string {
@@ -106,18 +102,27 @@ func ListOfficers(conn *goldap.Conn, configNC, caName string) ([]adcs.Ace, error
 	return aces, nil
 }
 
-// Backup requests the CA's private key + cert via ICertAdminD2 BackupPrep.
-// Not yet implemented — returns ErrRPCUnimplemented.
-func Backup(server, caName string) error { return ErrRPCUnimplemented }
-
-// IssueRequest approves a pending request by ID. Not implemented.
-func IssueRequest(server, caName string, id int) error { return ErrRPCUnimplemented }
-
-// DenyRequest denies a pending request. Not implemented.
-func DenyRequest(server, caName string, id int) error { return ErrRPCUnimplemented }
-
-// AddOfficer grants Manage-Certificates to the given SID. Not implemented.
-func AddOfficer(server, caName, sid string) error { return ErrRPCUnimplemented }
-
-// RemoveOfficer revokes Manage-Certificates from the given SID. Not implemented.
-func RemoveOfficer(server, caName, sid string) error { return ErrRPCUnimplemented }
+// LookupCADNSHostName queries LDAP for the pKIEnrollmentService.dNSHostName
+// attribute of caName — the canonical target for subsequent DCOM dialing.
+// Returns ("", nil) when the attribute is absent so callers can fall back
+// to a --ca-host override without treating the missing value as an error.
+func LookupCADNSHostName(conn *goldap.Conn, configNC, caName string) (string, error) {
+	dn := caDN(configNC, caName)
+	s := goldap.NewSearchRequest(
+		dn,
+		goldap.ScopeBaseObject,
+		goldap.NeverDerefAliases,
+		0, 0, false,
+		"(objectClass=*)",
+		[]string{adcs.AttrDNSHostName},
+		nil,
+	)
+	res, err := conn.Search(s)
+	if err != nil {
+		return "", fmt.Errorf("ca: lookup dNSHostName: %w", err)
+	}
+	if len(res.Entries) == 0 {
+		return "", fmt.Errorf("ca: no entry at %s", dn)
+	}
+	return res.Entries[0].GetAttributeValue(adcs.AttrDNSHostName), nil
+}
