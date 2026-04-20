@@ -1,0 +1,61 @@
+# Certigo local Docker lab.
+#
+# Two services:
+#   samba-ad-dc  - real Samba AD DC for LDAP/Kerberos/NTLM/DNS/SMB
+#   mock-adcs    - small Go HTTP stub that imitates a few AD CS endpoints.
+#                  AD CS proper is Windows-only and is tested in the Tier 3
+#                  VM lab (lab/vm/, future).
+
+networks:
+  certigo-lab:
+    driver: bridge
+
+volumes:
+  samba-data:
+
+services:
+  samba-ad-dc:
+    image: instantlinux/samba-dc:latest
+    container_name: certigo-samba-ad-dc
+    hostname: dc01
+    restart: unless-stopped
+    environment:
+      REALM: CTG.LOCAL
+      DOMAIN: CTG
+      DOMAIN_ACTION: provision
+      ADMIN_PASS: "Str0ngP@ssw0rd!"
+      DNSFORWARDER: 1.1.1.1
+      TZ: UTC
+    ports:
+      - "389:389/tcp"      # LDAP
+      - "636:636/tcp"      # LDAPS
+      - "88:88/tcp"        # Kerberos
+      - "88:88/udp"        # Kerberos
+      - "53:53/tcp"        # DNS
+      - "53:53/udp"        # DNS
+      - "445:445/tcp"      # SMB
+    volumes:
+      - samba-data:/var/lib/samba
+    networks:
+      - certigo-lab
+    healthcheck:
+      test: ["CMD-SHELL", "smbclient -L //localhost -U% >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  mock-adcs:
+    build:
+      context: ./mock-adcs
+      dockerfile: Dockerfile
+    container_name: certigo-mock-adcs
+    restart: unless-stopped
+    depends_on:
+      samba-ad-dc:
+        condition: service_healthy
+    ports:
+      - "8080:8080/tcp"    # HTTP
+      - "8443:8443/tcp"    # HTTPS (self-signed)
+    networks:
+      - certigo-lab
