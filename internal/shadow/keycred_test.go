@@ -81,7 +81,7 @@ func TestDNBinaryRoundTrip(t *testing.T) {
 		t.Fatalf("expected 4 colon-separated fields, got %d", len(parts))
 	}
 	// Length field must equal the number of hex characters, NOT the byte
-	// count — this is DNBinary syntax per RFC 4517.
+	// count - this is DNBinary syntax per RFC 4517.
 	var declared int
 	if _, err := fmt.Sscanf(parts[1], "%d", &declared); err != nil {
 		t.Fatalf("parse declared length: %v", err)

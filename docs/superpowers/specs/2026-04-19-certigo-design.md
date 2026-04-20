@@ -1,4 +1,4 @@
-# Certigo — Go 1:1 Port of Certipy
+# Certigo - Go 1:1 Port of Certipy
 
 **Status:** Draft for review
 **Date:** 2026-04-19
@@ -12,7 +12,7 @@ Ship a pure-Go, single-binary replacement for Python `certipy-ad` with full feat
 
 ## Non-goals
 
-- General-purpose NTLM relay framework (`relay` is scoped to AD CS targets only — matching Certipy).
+- General-purpose NTLM relay framework (`relay` is scoped to AD CS targets only - matching Certipy).
 - A library API with API stability guarantees before v1.0 (`pkg/certigo` exists but is unstable until v1).
 - Windows `ptt` LSA injection parity on non-Windows hosts (Linux/darwin `ptt` writes ccache only).
 - New features beyond what Certipy 5.0.3 ships. Scope is *port*, not *extend*.
@@ -28,7 +28,7 @@ Ship a pure-Go, single-binary replacement for Python `certipy-ad` with full feat
 ## Architectural principles
 
 - **Own the stack.** We write our own Kerberos PKINIT/U2U, our own SPNEGO bridge, our own ASN.1 helpers for AD CS quirks. Reuse high-quality primitives (`gokrb5`, `go-ldap`, `go-msrpc`, stdlib crypto, `go-pkcs12`) but do not add libraries whose release cadence we don't control.
-- **No cgo.** Static binaries only. This constraint is non-negotiable — it is the reason the port exists.
+- **No cgo.** Static binaries only. This constraint is non-negotiable - it is the reason the port exists.
 - **Bit-for-bit parity first, modernization later.** Default output matches Certipy exactly. A `--modern` opt-in may later improve formatting without breaking the default.
 - **Small, focused packages.** Each `internal/*` package has one responsibility and a narrow public API. Subcommands compose them.
 - **Evidence before claims.** Parity is proven by the harness, not asserted.
@@ -83,18 +83,18 @@ certigo/
 
 ### Package responsibilities
 
-- **`internal/auth`** — one `Credentials` struct carrying all auth modes (password, NT hash, Kerberos TGT, certificate/PFX). Exposes `LDAPBinder()`, `RPCAuth()`, `HTTPTransport()` so every network layer uses the same credentials the same way.
-- **`internal/auth/krb`** — AS-REQ, TGS-REQ, PKINIT (PA-PK-AS-REQ/REP + DH key derivation), U2U, S4U2Self/Proxy, ccache/kirbi I/O.
-- **`internal/auth/ntlm`** — NTLMv2 client (~400 LoC); reused by LDAP signed binds, HTTP basic-auth alternative, RPC, relay.
-- **`internal/auth/spnego`** — NegTokenInit / NegTokenResp wrappers; consumes either Kerberos AP-REQ or NTLM.
-- **`internal/ldap`** — SASL bind selector; TLS channel binding; paging; modify/add/delete helpers.
-- **`internal/rpc`** — binding builder (NCACN_IP_TCP, NCACN_NP), SPNEGO integration, RPC clients for: ICPR, ICertRequestD2, ICertAdminD2, ICertPassage, IWbemServices (DCOM).
-- **`internal/pki`** — X.509 parsing/building, CSR builder with arbitrary extension encoding (SAN, SID OID, OID application policies), PFX read/write with Impacket-compatible parameters, ASN.1 for PKINIT AuthPack and CMS SignedData, cert forging primitives.
-- **`internal/adcs`** — LDAP queries for pKIEnrollmentService objects (CAs), pKICertificateTemplate objects, enrollment ACLs on templates and CAs.
-- **`internal/esc`** — one file per ESC rule (`esc1.go`..`esc16.go`). Each exports `Check(tpl *Template, ca *CA, acls *ACLs) []Finding`.
-- **`internal/coerce`** — coercion RPC clients. One file per technique: `petitpotam.go` (EfsRpc), `dfscoerce.go` (NetrDfsRemoveStdRoot), `printerbug.go` (RpcRemoteFindFirstPrinterChangeNotificationEx).
-- **`internal/output`** — golden-file-tested formatters. Matches Certipy text output line-for-line, JSON keys byte-for-byte, zip archives identically structured; BloodHound community-edition format (CEs = cert-abuse edges).
-- **`internal/target`** — resolver: `-dc-ip`, `-ns`, SRV lookups for KDC, CNAME handling for CA DNS names.
+- **`internal/auth`** - one `Credentials` struct carrying all auth modes (password, NT hash, Kerberos TGT, certificate/PFX). Exposes `LDAPBinder()`, `RPCAuth()`, `HTTPTransport()` so every network layer uses the same credentials the same way.
+- **`internal/auth/krb`** - AS-REQ, TGS-REQ, PKINIT (PA-PK-AS-REQ/REP + DH key derivation), U2U, S4U2Self/Proxy, ccache/kirbi I/O.
+- **`internal/auth/ntlm`** - NTLMv2 client (~400 LoC); reused by LDAP signed binds, HTTP basic-auth alternative, RPC, relay.
+- **`internal/auth/spnego`** - NegTokenInit / NegTokenResp wrappers; consumes either Kerberos AP-REQ or NTLM.
+- **`internal/ldap`** - SASL bind selector; TLS channel binding; paging; modify/add/delete helpers.
+- **`internal/rpc`** - binding builder (NCACN_IP_TCP, NCACN_NP), SPNEGO integration, RPC clients for: ICPR, ICertRequestD2, ICertAdminD2, ICertPassage, IWbemServices (DCOM).
+- **`internal/pki`** - X.509 parsing/building, CSR builder with arbitrary extension encoding (SAN, SID OID, OID application policies), PFX read/write with Impacket-compatible parameters, ASN.1 for PKINIT AuthPack and CMS SignedData, cert forging primitives.
+- **`internal/adcs`** - LDAP queries for pKIEnrollmentService objects (CAs), pKICertificateTemplate objects, enrollment ACLs on templates and CAs.
+- **`internal/esc`** - one file per ESC rule (`esc1.go`..`esc16.go`). Each exports `Check(tpl *Template, ca *CA, acls *ACLs) []Finding`.
+- **`internal/coerce`** - coercion RPC clients. One file per technique: `petitpotam.go` (EfsRpc), `dfscoerce.go` (NetrDfsRemoveStdRoot), `printerbug.go` (RpcRemoteFindFirstPrinterChangeNotificationEx).
+- **`internal/output`** - golden-file-tested formatters. Matches Certipy text output line-for-line, JSON keys byte-for-byte, zip archives identically structured; BloodHound community-edition format (CEs = cert-abuse edges).
+- **`internal/target`** - resolver: `-dc-ip`, `-ns`, SRV lookups for KDC, CNAME handling for CA DNS names.
 
 ## Subcommand mapping
 
@@ -124,29 +124,29 @@ Binary name: `certigo`. (Users can symlink `certipy -> certigo` for muscle memor
 1. `auth.ParseFlags(cmd)` turns CLI flags into one `Credentials`.
 2. If `-pfx` given, load PFX → materialize certificate.
 3. If Kerberos required (`-k`, or implied by `-pfx`): `krb.GetTGT(creds)` runs AS-REQ or PKINIT. Ticket written to `$KRB5CCNAME` if set.
-4. Callers obtain bound objects: LDAP connection, RPC binding, HTTP transport — all authed from the same `Credentials`.
+4. Callers obtain bound objects: LDAP connection, RPC binding, HTTP transport - all authed from the same `Credentials`.
 5. `KRB5CONF` and `/etc/krb5.conf` drive realm/KDC discovery; `KRB5CCNAME` drives ticket cache I/O.
 
 ## Testing strategy
 
 Three-tier local harness. User never shares lab access.
 
-### Tier 1 — Fixture replay (CI-mandatory)
+### Tier 1 - Fixture replay (CI-mandatory)
 
-- `test/fixtures/` holds recorded LDAP replies, RPC pcaps, HTTP enrollment captures — produced once by `tools/capture/` run against user's own GOAD and committed (sanitized).
+- `test/fixtures/` holds recorded LDAP replies, RPC pcaps, HTTP enrollment captures - produced once by `tools/capture/` run against user's own GOAD and committed (sanitized).
 - `internal/ldap/mock`, `internal/rpc/mock`, and `httptest`-based HTTP mocks replay the fixtures.
-- Covers: all of `find`, `esc/*`, `output`, `cert`, `forge`, `parse`, `pki` round-trips, ASN.1, PFX, ccache/kirbi I/O — roughly 70% of certigo.
+- Covers: all of `find`, `esc/*`, `output`, `cert`, `forge`, `parse`, `pki` round-trips, ASN.1, PFX, ccache/kirbi I/O - roughly 70% of certigo.
 - Runs in `go test ./...`. Seconds. Zero external deps. Required for every PR.
 
-### Tier 2 — `docker compose` lab (one command, opt-in)
+### Tier 2 - `docker compose` lab (one command, opt-in)
 
 - `lab/docker/compose.yml` launches:
-  - `samba-ad-dc` — real LDAP / Kerberos / DNS.
-  - `mock-adcs` — in-repo Go service exposing fake `/certsrv/` + ICPR RPC + DCOM endpoints backed by replay corpus; returns pre-baked certs (no live CA signing).
+  - `samba-ad-dc` - real LDAP / Kerberos / DNS.
+  - `mock-adcs` - in-repo Go service exposing fake `/certsrv/` + ICPR RPC + DCOM endpoints backed by replay corpus; returns pre-baked certs (no live CA signing).
 - Covers: `auth` (real PKINIT against Samba), `shadow`, `account`, `template`, `ca`, Kerberos TGT/S4U, NTLM, partial `req`, partial `relay`.
 - `make parity-docker` exercises every subcommand that doesn't need a real Windows CA.
 
-### Tier 3 — Windows VM (manual, release-only)
+### Tier 3 - Windows VM (manual, release-only)
 
 - `lab/vm/` packer template builds Windows Server 2022 Eval arm64 under `qemu-system-aarch64` / UTM.
 - Provisioning: AD DS + AD CS + deliberately vulnerable template set (ESC1/2/3/4 baseline).
@@ -163,7 +163,7 @@ Three-tier local harness. User never shares lab access.
 ### Unit coverage targets
 
 - 80% for `pki`, `esc`, `output` (deterministic, fixture-driven).
-- Lower for `auth/krb`, `rpc`, `relay` — those lean on Tier 2/3 for end-to-end coverage.
+- Lower for `auth/krb`, `rpc`, `relay` - those lean on Tier 2/3 for end-to-end coverage.
 
 ## CI & release
 
@@ -208,7 +208,7 @@ Each milestone ends with a tagged release, updated `CHANGELOG.md`, and an update
 ## Out-of-scope / explicitly deferred
 
 - A library API with stability guarantees (`pkg/certigo` may change until v1.0).
-- Relay to targets other than AD CS (LDAP relay, SMB relay, etc.) — Certipy doesn't do this either.
+- Relay to targets other than AD CS (LDAP relay, SMB relay, etc.) - Certipy doesn't do this either.
 - Windows `ptt` via `LsaCallAuthenticationPackage` on hosts without `golang.org/x/sys/windows` availability.
 - UI/TUI.
 - Self-updating binary.
@@ -217,11 +217,11 @@ Each milestone ends with a tagged release, updated `CHANGELOG.md`, and an update
 ## Risks
 
 1. **PKINIT complexity.** Pure-Go PKINIT doesn't exist as a drop-in library. Mitigation: M1 budgets 3 weeks; if blocked, fallback options include (a) vendoring a Go PKINIT fork if one emerges, (b) piecewise porting impacket's ASN.1 definitions verbatim.
-2. **go-msrpc gap coverage.** ICertPassage and some ICertAdminD2 methods may not be exposed. Mitigation: Q4=C — we hand-roll gaps using go-msrpc's lower-level NDR primitives.
+2. **go-msrpc gap coverage.** ICertPassage and some ICertAdminD2 methods may not be exposed. Mitigation: Q4=C - we hand-roll gaps using go-msrpc's lower-level NDR primitives.
 3. **Fixture drift.** If certipy-ad ships a 5.0.4 with format changes, our fixtures go stale. Mitigation: `tools/capture/` makes re-baselining a one-command operation; we pin against a specific certipy-ad version in CI.
 4. **Windows LSA for `ptt`.** `golang.org/x/sys/windows` LSA wrappers may be incomplete. Mitigation: accept Linux-only `ptt` if needed and document; add Windows support in a point release.
 5. **Scope creep.** Certipy gets new ESCs periodically. Mitigation: we freeze parity against 5.0.3; new ESCs are v1.x features, not blockers for v1.0.
 
 ## Open questions
 
-None at time of spec write — all Q1-Q9 resolved. Later review may surface implementation-level uncertainties that should be captured as design updates.
+None at time of spec write - all Q1-Q9 resolved. Later review may surface implementation-level uncertainties that should be captured as design updates.

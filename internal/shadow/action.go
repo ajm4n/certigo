@@ -92,13 +92,13 @@ func List(opts Options) ([]*KeyCredential, error) {
 	return out, nil
 }
 
-// Info is List today — callers distinguish "info" by choosing a more
+// Info is List today - callers distinguish "info" by choosing a more
 // verbose formatter. The signature matches the spec and leaves room for
 // pulling decoded-KeyMaterial extras in the future.
 func Info(opts Options) ([]*KeyCredential, error) { return List(opts) }
 
 // Clear removes ALL msDS-KeyCredentialLink values with a single LDAP
-// REPLACE carrying an empty list — the canonical way to empty a
+// REPLACE carrying an empty list - the canonical way to empty a
 // multi-valued attribute.
 func Clear(opts Options) error {
 	if err := validateLDAPOpts(opts); err != nil {
@@ -139,7 +139,7 @@ func Remove(opts Options, deviceID string) error {
 	for _, v := range raws {
 		kc, _, perr := ParseDNBinary(v)
 		if perr != nil {
-			// Unparseable entries are preserved — we only remove the
+			// Unparseable entries are preserved - we only remove the
 			// specific match.
 			keep = append(keep, v)
 			continue

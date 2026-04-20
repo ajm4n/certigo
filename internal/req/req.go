@@ -116,11 +116,11 @@ func postCertSrv(opts Options, csrDER []byte) (*x509.Certificate, error) {
 
 	client := &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: opts.TLSInsecure}, // #nosec G402 — opt-in via --insecure-tls
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: opts.TLSInsecure}, // #nosec G402 - opt-in via --insecure-tls
 		},
 	}
 
-	// Step 1 — POST /certsrv/certfnsh.asp with the CSR.
+	// Step 1 - POST /certsrv/certfnsh.asp with the CSR.
 	csrPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrDER})
 	form := url.Values{}
 	form.Set("Mode", "newreq")
@@ -157,7 +157,7 @@ func postCertSrv(opts Options, csrDER []byte) (*x509.Certificate, error) {
 	}
 	reqID := m[1]
 
-	// Step 2 — GET /certsrv/certnew.cer?ReqID=<id>&Enc=b64 for the PEM cert.
+	// Step 2 - GET /certsrv/certnew.cer?ReqID=<id>&Enc=b64 for the PEM cert.
 	getURL := fmt.Sprintf("%s/certsrv/certnew.cer?ReqID=%s&Enc=b64", base, reqID)
 	getReq, _ := http.NewRequest("GET", getURL, nil)
 	if opts.Username != "" {

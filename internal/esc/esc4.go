@@ -2,7 +2,7 @@ package esc
 
 import "github.com/ajm4n/certigo/internal/adcs"
 
-// ESC4 — Low-privilege principal holds WRITE_OWNER, WRITE_DACL,
+// ESC4 - Low-privilege principal holds WRITE_OWNER, WRITE_DACL,
 // WRITE_PROPERTY, or FULL_CONTROL over the template object itself. Such
 // a principal can rewrite the template into an ESC1 configuration at
 // will.

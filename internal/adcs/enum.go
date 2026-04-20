@@ -16,7 +16,7 @@ var ErrConfigNCUnknown = errors.New("adcs: configuration NC is empty and could n
 //
 // It issues one base-scope search at BaseDN="" with filter
 // "(objectClass=*)" and no auth required. The returned strings are
-// verbatim from the server — e.g. "DC=corp,DC=local" /
+// verbatim from the server - e.g. "DC=corp,DC=local" /
 // "CN=Configuration,DC=corp,DC=local".
 func RootDSE(conn *goldap.Conn) (domainNC, configNC string, err error) {
 	if conn == nil {
@@ -56,7 +56,7 @@ func RootDSE(conn *goldap.Conn) (domainNC, configNC string, err error) {
 
 // EnumCAs queries the directory for pKIEnrollmentService objects and
 // returns one CertificateAuthority per entry. searchBase is the
-// configuration NC — e.g. "CN=Configuration,DC=corp,DC=local". If the
+// configuration NC - e.g. "CN=Configuration,DC=corp,DC=local". If the
 // argument is empty, RootDSE is queried to discover it.
 func EnumCAs(conn *goldap.Conn, searchBase string) ([]*CertificateAuthority, error) {
 	if conn == nil {
@@ -107,7 +107,7 @@ func EnumCAs(conn *goldap.Conn, searchBase string) ([]*CertificateAuthority, err
 // EnumTemplates queries the directory for pKICertificateTemplate objects
 // under CN=Certificate Templates,CN=Public Key Services,CN=Services,
 // <configNC>. All templates are returned regardless of publication
-// status or perceived vulnerability — the ESC rule engine filters.
+// status or perceived vulnerability - the ESC rule engine filters.
 func EnumTemplates(conn *goldap.Conn, configNC string) ([]*Template, error) {
 	if conn == nil {
 		return nil, errors.New("adcs: EnumTemplates: nil connection")

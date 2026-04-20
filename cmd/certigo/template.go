@@ -172,7 +172,7 @@ func runTemplate(f *templateFlags) error {
 			if err := os.WriteFile(f.file, snap, 0o600); err != nil {
 				return err
 			}
-			fmt.Printf("backup saved to %s — restore with: certigo template --action restore --name %s --file %s\n",
+			fmt.Printf("backup saved to %s - restore with: certigo template --action restore --name %s --file %s\n",
 				f.file, f.name, f.file)
 		}
 		if err := template.Write(opts, template.VulnerableAttrs()); err != nil {

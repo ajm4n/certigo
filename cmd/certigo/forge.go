@@ -31,7 +31,7 @@ func newForgeCmd() *cobra.Command {
 		},
 	}
 	fl := cmd.Flags()
-	fl.StringVar(&f.caPFX, "ca-pfx", "", "CA PFX file (with private key) — required")
+	fl.StringVar(&f.caPFX, "ca-pfx", "", "CA PFX file (with private key) - required")
 	fl.StringVar(&f.caPass, "ca-password", "", "CA PFX password")
 	fl.StringVar(&f.outPFX, "out", "forged.pfx", "output PFX path")
 	fl.StringVar(&f.outPass, "out-password", "", "output PFX password")

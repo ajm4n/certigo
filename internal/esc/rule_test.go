@@ -6,7 +6,7 @@ import (
 	"github.com/ajm4n/certigo/internal/adcs"
 )
 
-// lowPrivSID is an example domain-scoped SID that is NOT privileged —
+// lowPrivSID is an example domain-scoped SID that is NOT privileged -
 // trailing RID 1103 is outside the privileged-RID set.
 const lowPrivSID = "S-1-5-21-1111111111-2222222222-3333333333-1103"
 
@@ -14,7 +14,7 @@ const lowPrivSID = "S-1-5-21-1111111111-2222222222-3333333333-1103"
 const domainAdminsSID = "S-1-5-21-1111111111-2222222222-3333333333-512"
 
 // baseEnrollable returns a Template that a low-priv user can enrol but
-// is otherwise innocuous — tests tweak individual fields.
+// is otherwise innocuous - tests tweak individual fields.
 func baseEnrollable() *adcs.Template {
 	return &adcs.Template{
 		Name:        "Test",

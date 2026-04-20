@@ -25,7 +25,7 @@ func buildSyntheticTicket(t *testing.T, realm string, sname types.PrincipalName)
 		Realm:  realm,
 		SName:  sname,
 		EncPart: types.EncryptedData{
-			EType:  18, // aes256-cts-hmac-sha1-96 — a plausible etype for bytes
+			EType:  18, // aes256-cts-hmac-sha1-96 - a plausible etype for bytes
 			KVNO:   1,
 			Cipher: []byte("ciphertext-bytes"),
 		},
@@ -63,7 +63,7 @@ func buildSyntheticCCacheBytes(t *testing.T, client types.PrincipalName, clientR
 }
 
 // loadCCacheFromBytes writes b to a temp file and loads it via
-// credentials.LoadCCache — required because credentials.CCache.Unmarshal
+// credentials.LoadCCache - required because credentials.CCache.Unmarshal
 // is available but LoadCCache is the idiomatic entrypoint.
 func loadCCacheFromBytes(t *testing.T, b []byte) *credentials.CCache {
 	t.Helper()

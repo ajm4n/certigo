@@ -53,7 +53,7 @@ type Template struct {
 	RequiresManagerApproval bool
 	AuthorizedSignatures    int
 
-	// EKU / Application Policy OIDs — the fundamental vulnerability surface.
+	// EKU / Application Policy OIDs - the fundamental vulnerability surface.
 	EKUs                []string
 	ApplicationPolicies []string
 

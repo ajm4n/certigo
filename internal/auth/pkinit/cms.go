@@ -72,7 +72,7 @@ var nullRawValue = asn1.RawValue{Tag: asn1.TagNull, Class: asn1.ClassUniversal, 
 // BuildSignedData wraps data into a CMS SignedData (RFC 5652) signed by
 // signerKey, with signerCert embedded in the certificates field. We always
 // use SHA-256 for both the digest and the RSA signature (PKCS#1 v1.5).
-// eContentType is carried verbatim as the EncapsulatedContentInfo's OID —
+// eContentType is carried verbatim as the EncapsulatedContentInfo's OID -
 // for PKINIT AuthPack payloads this is id-pkinit-authData.
 func BuildSignedData(eContentType asn1.ObjectIdentifier, data []byte,
 	signerCert *x509.Certificate, signerKey crypto.Signer) ([]byte, error) {
@@ -161,7 +161,7 @@ func BuildSignedData(eContentType asn1.ObjectIdentifier, data []byte,
 // only ever emit a single cert; encoding.asn1 does not natively support the
 // implicit SET OF over a heterogeneous ANY, so we assemble the tag by hand.
 func buildCertificatesField(cert *x509.Certificate) (asn1.RawValue, error) {
-	// The cert's Raw field is already DER-encoded — concatenate them into
+	// The cert's Raw field is already DER-encoded - concatenate them into
 	// the SET body.
 	body := append([]byte{}, cert.Raw...)
 	return asn1.RawValue{
@@ -174,7 +174,7 @@ func buildCertificatesField(cert *x509.Certificate) (asn1.RawValue, error) {
 
 // ParseSignedData reads a DER-encoded CMS SignedData blob, returning the
 // inner eContent octets and the first embedded signer certificate. Signature
-// verification is intentionally out of scope — callers that need to pin the
+// verification is intentionally out of scope - callers that need to pin the
 // KDC's CA should verify signerCert themselves.
 func ParseSignedData(der []byte) (eContent []byte, signerCert *x509.Certificate, err error) {
 	var outer contentInfo

@@ -2,7 +2,7 @@ package esc
 
 import "github.com/ajm4n/certigo/internal/adcs"
 
-// ESC9 — Template has CT_FLAG_NO_SECURITY_EXTENSION
+// ESC9 - Template has CT_FLAG_NO_SECURITY_EXTENSION
 // (0x80000000 in ms-PKI-Certificate-Name-Flag) set. The resulting
 // certificate will NOT contain the szOID_NTDS_CA_SECURITY_EXT
 // (1.3.6.1.4.1.311.25.2) SID-binding extension, so a weak DC mapping

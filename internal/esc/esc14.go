@@ -2,7 +2,7 @@ package esc
 
 import "github.com/ajm4n/certigo/internal/adcs"
 
-// ESC14 — Template lets the requester dictate altSecurityIdentities
+// ESC14 - Template lets the requester dictate altSecurityIdentities
 // (explicit certificate-to-account mapping). When the DC honours weak
 // altSecurityIdentities mappings, a cert crafted by a low-priv user
 // can be mapped to a privileged account.

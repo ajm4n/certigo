@@ -2,7 +2,7 @@ package esc
 
 import "github.com/ajm4n/certigo/internal/adcs"
 
-// ESC13 — Template issuance policy contains a certificate policy OID
+// ESC13 - Template issuance policy contains a certificate policy OID
 // that is linked to a privileged universal/domain group (via the
 // msDS-OIDToGroupLink attribute on the OID object). Enrolling the
 // template confers group membership in the linked group through

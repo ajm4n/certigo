@@ -155,7 +155,7 @@ func runShadow(f *shadowFlags) error {
 		}
 		fmt.Printf("removed entry %s\n", f.deviceID)
 	case "auto":
-		return fmt.Errorf("shadow auto: not yet implemented — run add then auth then remove manually")
+		return fmt.Errorf("shadow auto: not yet implemented - run add then auth then remove manually")
 	default:
 		return fmt.Errorf("shadow: unknown --action %q", f.action)
 	}

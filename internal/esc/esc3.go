@@ -2,7 +2,7 @@ package esc
 
 import "github.com/ajm4n/certigo/internal/adcs"
 
-// ESC3 — Template grants the Certificate Request Agent EKU
+// ESC3 - Template grants the Certificate Request Agent EKU
 // (1.3.6.1.4.1.311.20.2.1) to low-priv principals, enabling "enrol on
 // behalf of" attacks against another (possibly privileged) target.
 type ESC3 struct{}

@@ -23,7 +23,7 @@ type Credentials struct {
 	Username string
 	Domain   string // NetBIOS or DNS form; subcommands normalize per call
 
-	// Secret material — exactly one of these groups is typically set.
+	// Secret material - exactly one of these groups is typically set.
 	Password string
 	LMHash   []byte // 16 bytes; often zero (AAD3B435 sentinel)
 	NTHash   []byte // 16 bytes
@@ -40,7 +40,7 @@ type Credentials struct {
 	PEMCertPath string
 	PEMKeyPath  string
 
-	// Ticket cache path — empty = use $KRB5CCNAME / default. Written by `auth`
+	// Ticket cache path - empty = use $KRB5CCNAME / default. Written by `auth`
 	// subcommand after PKINIT/AS-REQ succeeds.
 	CCachePath string
 
@@ -53,7 +53,7 @@ type Credentials struct {
 }
 
 // Validate confirms the credential set is coherent enough to attempt auth.
-// It does not verify the secrets against a KDC — that happens at bind time.
+// It does not verify the secrets against a KDC - that happens at bind time.
 func (c *Credentials) Validate() error {
 	if c == nil {
 		return errors.New("auth: nil credentials")

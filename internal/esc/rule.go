@@ -6,7 +6,7 @@ import "github.com/ajm4n/certigo/internal/adcs"
 // publishing CA (may be nil if the template is unpublished, or if the CA
 // context is unavailable). Output: zero or more findings.
 //
-// Rules must be side-effect-free on their inputs — Scan is the only
+// Rules must be side-effect-free on their inputs - Scan is the only
 // caller that mutates Template.Findings.
 type Rule interface {
 	// Name returns the stable identifier, e.g. "ESC1".
@@ -16,7 +16,7 @@ type Rule interface {
 }
 
 // AllRules returns every registered rule in display order
-// (ESC1, ESC2, ...). ESC12 is intentionally absent — no public ESC12
+// (ESC1, ESC2, ...). ESC12 is intentionally absent - no public ESC12
 // definition exists at time of writing. Additional rules are registered
 // here as they land.
 func AllRules() []Rule {

@@ -2,7 +2,7 @@ package esc
 
 import "github.com/ajm4n/certigo/internal/adcs"
 
-// ESC15 — Certificate-Based Authentication via Schannel (UPN/DNS SAN
+// ESC15 - Certificate-Based Authentication via Schannel (UPN/DNS SAN
 // with weak mapping). The defect enables using a certificate with a
 // requester-specified UPN/DNS SAN to authenticate via Schannel when
 // the binding is weak.

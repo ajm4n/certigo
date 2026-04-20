@@ -15,7 +15,7 @@ func TestNTOWFv2Vector(t *testing.T) {
 	}
 }
 
-// MS-NLMP §4.2.4.1.2 — full NTLMv2 response.
+// MS-NLMP §4.2.4.1.2 - full NTLMv2 response.
 func TestNTLMv2ResponseVector(t *testing.T) {
 	responseKey, _ := hex.DecodeString("0c868a403bfd7a93a3001ef22ef02e3f")
 	serverChal, _ := hex.DecodeString("0123456789abcdef")
@@ -55,7 +55,7 @@ func TestLMv2ResponseVector(t *testing.T) {
 	}
 }
 
-// MS-NLMP §4.2.4.2 — SessionBaseKey.
+// MS-NLMP §4.2.4.2 - SessionBaseKey.
 func TestSessionBaseKeyVector(t *testing.T) {
 	responseKey, _ := hex.DecodeString("0c868a403bfd7a93a3001ef22ef02e3f")
 	ntProofStr, _ := hex.DecodeString("68cd0ab851e51c96aabc927bebef6a1c")

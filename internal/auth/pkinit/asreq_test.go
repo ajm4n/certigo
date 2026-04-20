@@ -28,7 +28,7 @@ func TestPAPKASREQ_Roundtrip(t *testing.T) {
 		t.Fatalf("signedAuthPack mismatch:\n got: %x\nwant: %x", got, want)
 	}
 
-	// An empty payload must be rejected — signed data of length zero is
+	// An empty payload must be rejected - signed data of length zero is
 	// nonsensical and the KDC would reject it, so we refuse at encode time.
 	if _, err := MarshalPAPKASReq(nil); err == nil {
 		t.Fatalf("MarshalPAPKASReq(nil) unexpectedly succeeded")
@@ -67,7 +67,7 @@ func TestKDCKeyDerivation(t *testing.T) {
 		t.Fatalf("derived key mismatch:\n got: %x\nwant: %x", key.KeyValue, want)
 	}
 
-	// AES128 path — 16-byte truncation of the same SHA1 stream.
+	// AES128 path - 16-byte truncation of the same SHA1 stream.
 	key128, err := DeriveASReplyKey(etypeID.AES128_CTS_HMAC_SHA1_96, shared, nil, nil)
 	if err != nil {
 		t.Fatalf("DeriveASReplyKey AES128: %v", err)
@@ -93,7 +93,7 @@ func TestKDCKeyDerivation_WithNonces(t *testing.T) {
 		t.Fatalf("DeriveASReplyKey: %v", err)
 	}
 
-	// Compare with a bare-shared derivation — should differ when nonces
+	// Compare with a bare-shared derivation - should differ when nonces
 	// are folded in.
 	bare, err := DeriveASReplyKey(etypeID.AES256_CTS_HMAC_SHA1_96, shared, nil, nil)
 	if err != nil {

@@ -2,7 +2,7 @@ package esc
 
 import "github.com/ajm4n/certigo/internal/adcs"
 
-// ESC8 — CA web enrollment endpoint reachable over HTTP (no TLS) and
+// ESC8 - CA web enrollment endpoint reachable over HTTP (no TLS) and
 // NTLM allowed, enabling NTLM relay into /certsrv/ to coerce certificate
 // issuance as a relayed principal.
 //

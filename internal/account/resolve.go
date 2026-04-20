@@ -10,7 +10,7 @@ import (
 
 // ResolveDN looks up the DN for a given sAMAccountName under baseDN. The
 // sAMAccountName may be supplied with or without the trailing "$" used for
-// computer accounts — both forms are searched. The first match wins; an
+// computer accounts - both forms are searched. The first match wins; an
 // error is returned when the search fails or yields zero hits.
 func ResolveDN(conn *goldap.Conn, baseDN, samAccountName string) (string, error) {
 	if conn == nil {

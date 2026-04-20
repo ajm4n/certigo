@@ -22,7 +22,7 @@ import (
 // truncated SHA1 stream IS the protocol key. x is the DH shared secret on
 // its own when neither side sends a DH nonce; when present the nonces are
 // concatenated after DHSharedSecret (RFC 4556 §3.2.3.1). We expose both
-// forms via clientDHNonce / serverDHNonce parameters — pass nil to use
+// forms via clientDHNonce / serverDHNonce parameters - pass nil to use
 // the bare shared secret.
 func DeriveASReplyKey(etypeID int32, dhSharedSecret, clientDHNonce, serverDHNonce []byte) (types.EncryptionKey, error) {
 	et, err := crypto.GetEtype(etypeID)

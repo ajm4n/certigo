@@ -2,7 +2,7 @@ package esc
 
 import "github.com/ajm4n/certigo/internal/adcs"
 
-// ESC6 — The CA has the EDITF_ATTRIBUTESUBJECTALTNAME2 flag set in its
+// ESC6 - The CA has the EDITF_ATTRIBUTESUBJECTALTNAME2 flag set in its
 // EditFlags. Any enrollee can embed a SAN in their request regardless
 // of template-level restrictions, effectively turning every template
 // into ESC1 for SAN-based impersonation.

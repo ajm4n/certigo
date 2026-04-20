@@ -6,12 +6,12 @@
 //
 //  1. pKIEnrollmentService objects under
 //     CN=Enrollment Services,CN=Public Key Services,CN=Services,<configNC>
-//     — one per CA, listing published templates, DNS name, and signing
+//     - one per CA, listing published templates, DNS name, and signing
 //     certificate (see EnumCAs).
 //
 //  2. pKICertificateTemplate objects under
 //     CN=Certificate Templates,CN=Public Key Services,CN=Services,<configNC>
-//     — one per defined template, with EKUs, ms-PKI flag words, and an
+//     - one per defined template, with EKUs, ms-PKI flag words, and an
 //     nTSecurityDescriptor whose DACL encodes Enroll / AutoEnroll /
 //     WriteDacl / WriteOwner rights per principal (see EnumTemplates).
 //

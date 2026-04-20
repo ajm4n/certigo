@@ -76,7 +76,7 @@ func TestIssueDenyZeroID(t *testing.T) {
 	t.Parallel()
 	// Non-nil but unconnected client: the zero-id guard should fire
 	// before we touch the wire. We construct a bare struct (no conn)
-	// — the zero-id path returns without making a call.
+	// - the zero-id path returns without making a call.
 	cli := &rpcClient{authorityName: "corp-CA"}
 	if err := cli.IssueRequest(0); err == nil || !strings.Contains(err.Error(), "non-zero") {
 		t.Errorf("IssueRequest(0): want non-zero guard, got %v", err)

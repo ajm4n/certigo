@@ -12,7 +12,7 @@ import (
 // surfaced verbatim as the Ace.Name.
 type SIDResolver func(sid string) (string, error)
 
-// MS-DTYP §2.4.4 — ACE types. We decode the four allow/deny variants
+// MS-DTYP §2.4.4 - ACE types. We decode the four allow/deny variants
 // commonly seen on AD objects. Other types are surfaced as "Unknown".
 const (
 	aceAccessAllowed         byte = 0x00
@@ -52,7 +52,7 @@ func ParseSecurityDescriptor(desc []byte, resolve SIDResolver) ([]Ace, error) {
 	if len(desc) < 20 {
 		return nil, fmt.Errorf("adcs: security descriptor too short (%d bytes)", len(desc))
 	}
-	// SECURITY_DESCRIPTOR header (self-relative form assumed — AD
+	// SECURITY_DESCRIPTOR header (self-relative form assumed - AD
 	// stores SDs self-relative in nTSecurityDescriptor).
 	//   byte  0   : Revision
 	//   byte  1   : Sbz1
@@ -63,7 +63,7 @@ func ParseSecurityDescriptor(desc []byte, resolve SIDResolver) ([]Ace, error) {
 	//   bytes 16-19: OffsetDacl
 	daclOffset := binary.LittleEndian.Uint32(desc[16:20])
 	if daclOffset == 0 {
-		// No DACL present — either a NULL DACL (grants everyone
+		// No DACL present - either a NULL DACL (grants everyone
 		// everything; unusual for AD objects) or a permission-less
 		// object. Return an empty slice rather than erroring.
 		return nil, nil
@@ -130,7 +130,7 @@ func parseACE(aceType byte, body []byte, resolve SIDResolver) (Ace, bool) {
 	case aceAccessAllowedObject, aceAccessDeniedObject:
 		return parseObjectACE(aceType, body, resolve)
 	case aceSystemAudit, aceSystemAuditObject:
-		// Skip audit entries — we only care about the DACL.
+		// Skip audit entries - we only care about the DACL.
 		return Ace{}, false
 	default:
 		return Ace{}, false
@@ -238,7 +238,7 @@ func resolveSID(sid string, resolve SIDResolver) string {
 }
 
 // rightsSummary produces a short human-readable description of the
-// access mask. Not exhaustive — we surface the bits that matter for
+// access mask. Not exhaustive - we surface the bits that matter for
 // AD CS ESC rule evaluation (Enroll, WriteDacl, WriteOwner, etc.).
 func rightsSummary(aceType byte, mask uint32) string {
 	var parts []string

@@ -15,12 +15,12 @@
 // Detection coverage matrix:
 //
 //	ESC1-ESC7     fully detectable from Template + CA fields
-//	ESC8          partial — flagged when WebEnrollment && !HTTPS; NTLM
+//	ESC8          partial - flagged when WebEnrollment && !HTTPS; NTLM
 //	              channel-binding/EPA probes are out of scope here
 //	ESC9, ESC14   fully detectable from template name-flag bits
-//	ESC10, ESC15  heuristic — require DC registry probes; we flag templates
+//	ESC10, ESC15  heuristic - require DC registry probes; we flag templates
 //	              whose SAN is requester-specifiable as *candidates*
-//	ESC11         partial — requires CA flag bit; we inspect
+//	ESC11         partial - requires CA flag bit; we inspect
 //	              CertificateAuthority.Flags
 //	ESC13, ESC16  detected by inspecting issuance-policy OIDs referenced by
 //	              the template; privileged-group/universal-group linkage is

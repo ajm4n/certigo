@@ -9,7 +9,7 @@ const (
 	ClassPKIEnrollmentService   = "pKIEnrollmentService"
 	ClassPKICertificateTemplate = "pKICertificateTemplate"
 
-	// Object-category DNs appear only in filter fragments — the
+	// Object-category DNs appear only in filter fragments - the
 	// pKIEnrollmentService objectCategory literal below is checked in a
 	// sub-filter form, but we primarily use (objectClass=...) to avoid
 	// dragging in a DN that varies per forest. Certipy uses

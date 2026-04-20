@@ -49,8 +49,8 @@ var defaultCustomKeyInfo = []byte{0x01, 0x00}
 // KeyCredential represents one decoded msDS-KeyCredentialLink entry.
 type KeyCredential struct {
 	Version       uint32
-	KeyID         []byte // 32 bytes — SHA-256 of the KeyMaterial (public-key blob).
-	KeyHash       []byte // 32 bytes — SHA-256 over the serialized entries that follow.
+	KeyID         []byte // 32 bytes - SHA-256 of the KeyMaterial (public-key blob).
+	KeyHash       []byte // 32 bytes - SHA-256 over the serialized entries that follow.
 	KeyMaterial   []byte // BCRYPT_RSAKEY_BLOB for RSA keys.
 	KeyUsage      byte
 	KeySource     byte
@@ -203,7 +203,7 @@ func UnmarshalBlob(raw []byte) (*KeyCredential, error) {
 				kc.CreationTime = fileTimeFromBytes(val)
 			}
 		default:
-			// Unknown entry — skip silently for forward compat.
+			// Unknown entry - skip silently for forward compat.
 		}
 		pos += length
 	}

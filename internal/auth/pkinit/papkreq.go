@@ -13,7 +13,7 @@ import (
 //	    kdcPkId                 [2] IMPLICIT OCTET STRING OPTIONAL
 //	}
 //
-// We always emit signedAuthPack and leave the two optional fields absent —
+// We always emit signedAuthPack and leave the two optional fields absent -
 // Active Directory KDCs do not require them for the typical client-cert flow
 // and supplying them invites spurious "unknown trusted-CA" errors.
 type paPkAsReq struct {
@@ -63,7 +63,7 @@ type dhRepInfo struct {
 	ServerDHNonce []byte `asn1:"explicit,optional,tag:1"`
 }
 
-// kdcDHKeyInfo is RFC 4556 §3.2.3.1 — the payload wrapped inside
+// kdcDHKeyInfo is RFC 4556 §3.2.3.1 - the payload wrapped inside
 // dhSignedData's eContent. SubjectPublicKey is the DH Y value encoded as an
 // INTEGER then wrapped in a BIT STRING, matching the client's AuthPack.
 type kdcDHKeyInfo struct {
@@ -84,8 +84,8 @@ func PAPKASRepDHInfo(der []byte) (dhSignedData []byte, serverDHNonce []byte, err
 	return info.DHSignedData, info.ServerDHNonce, nil
 }
 
-// ParsePAPKASRep parses a PA-PK-AS-REP blob and — for the dhInfo [0]
-// alternative only — returns the inner dhSignedData bytes and the optional
+// ParsePAPKASRep parses a PA-PK-AS-REP blob and - for the dhInfo [0]
+// alternative only - returns the inner dhSignedData bytes and the optional
 // serverDHNonce. RFC 4556 §3.2.3 permits a second [1] encKeyPack variant
 // that we do not use; callers encountering it receive a descriptive error.
 func ParsePAPKASRep(der []byte) (dhSignedData, serverDHNonce []byte, err error) {

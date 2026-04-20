@@ -1,5 +1,5 @@
 // Package coerce provides DCOM/RPC triggers that force a target server
-// to authenticate to an attacker-controlled URL — a standard pattern for
+// to authenticate to an attacker-controlled URL - a standard pattern for
 // catching NTLM tickets for relay.
 //
 // PetitPotam is implemented via MS-EFSR EfsRpcOpenFileRaw. DFSCoerce and
@@ -28,7 +28,7 @@ var ErrUnimplemented = errors.New("coerce: RPC trigger not yet implemented")
 // TriggerPetitPotam invokes MS-EFSR EfsRpcOpenFileRaw against target to coax
 // it into authenticating to attackerURL (a UNC path like \\attacker\share\x).
 //
-// A successful coercion typically produces an AUTHN error — the remote
+// A successful coercion typically produces an AUTHN error - the remote
 // EFSRPC endpoint reports it could not open the path, which is expected
 // because our attacker UNC isn't a real EFS file. We treat any clean
 // response (or any error other than a connection failure) as a successful

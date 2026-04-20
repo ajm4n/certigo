@@ -1,4 +1,4 @@
-// Package ca — DCOM / MS-CSRA (ICertAdminD + ICertAdminD2) bindings.
+// Package ca - DCOM / MS-CSRA (ICertAdminD + ICertAdminD2) bindings.
 //
 // Activation flow (per MS-DCOM §3.2.4.1.1):
 //
@@ -15,7 +15,7 @@
 // for single-class activation, and an official go-msrpc example
 // (examples/samples_with_config/csra_enum_certdb.go) uses it against the
 // exact same coclass we need. IRemoteSCMActivator is also re-exported from
-// go-msrpc at msrpc/dcom/iremotescmactivator/v0 — kept as an option in
+// go-msrpc at msrpc/dcom/iremotescmactivator/v0 - kept as an option in
 // iremotescmactivator-gated code paths upstream if we ever need
 // RemoteCreateInstance's richer property set.
 package ca
@@ -50,7 +50,7 @@ import (
 )
 
 // CertAdminD2ClassID is the DCOM coclass for ICertAdminD2 on an enterprise
-// CA — registered by certsrv.exe. See MS-CSRA §1.9.
+// CA - registered by certsrv.exe. See MS-CSRA §1.9.
 var CertAdminD2ClassID = uuid.MustParse("d99e6e73-fc88-11d0-b498-00a0c90312f3")
 
 // CR_PROP_CASIGCERT is the MS-WCCE §3.2.1.4.3.2 property ID for retrieving
@@ -102,7 +102,7 @@ func DialRPCWithNTHash(server, authority, user string, hash []byte) (*Client, er
 
 // dialRPC establishes a DCOM connection to the CA server and binds the
 // ICertAdminD / ICertAdminD2 interfaces. server is the CA's dNSHostName
-// (no port). authority is the CA's CN — returned attribute names differ;
+// (no port). authority is the CA's CN - returned attribute names differ;
 // see adcs.CertificateAuthority.Name. user is in "DOMAIN\\user" or plain
 // "user" form. If useHash is true, password is treated as an NT hash
 // (hex-encoded).
@@ -212,7 +212,7 @@ func dialRPCWithCred(server, authority string, cred credential.Credential) (*rpc
 		ORPCThis: &dcom.ORPCThis{Version: alive.COMVersion},
 		ClassID:  dtyp.GUIDFromUUID(CertAdminD2ClassID),
 		IIDs:     []*dcom.IID{icertadmind2.CertAdminD2IID},
-		// 7 = ncacn_ip_tcp. We intentionally omit named pipes (15) —
+		// 7 = ncacn_ip_tcp. We intentionally omit named pipes (15) -
 		// AD CS always exposes ICertAdminD2 via TCP on modern Windows,
 		// and keeping the protocol list minimal avoids the server
 		// replying with a pipe endpoint we can't dial from Unix hosts.

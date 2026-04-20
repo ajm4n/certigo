@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship a pure-Go NTLMv2 client library at `internal/auth/ntlm` — sufficient to authenticate to any Windows service expecting NTLM (LDAP signed binds, HTTP challenge-response, SMB, RPC). Fully tested against MS-NLMP §4.2 golden vectors. No external dependencies beyond stdlib.
+**Goal:** Ship a pure-Go NTLMv2 client library at `internal/auth/ntlm` - sufficient to authenticate to any Windows service expecting NTLM (LDAP signed binds, HTTP challenge-response, SMB, RPC). Fully tested against MS-NLMP §4.2 golden vectors. No external dependencies beyond stdlib.
 
-**Architecture:** Five tight files inside `internal/auth/ntlm/` — `constants.go` (flags + AV IDs), `message.go` (NEGOTIATE/CHALLENGE/AUTHENTICATE codec), `avpair.go` (AV_PAIR encode/decode), `crypto.go` (NTOWFv2, NTLMv2 response, session key derivation), `session.go` (Client handshake + optional signing/sealing). Every function is tested with MS-NLMP published vectors where available; no mocks, no external lab.
+**Architecture:** Five tight files inside `internal/auth/ntlm/` - `constants.go` (flags + AV IDs), `message.go` (NEGOTIATE/CHALLENGE/AUTHENTICATE codec), `avpair.go` (AV_PAIR encode/decode), `crypto.go` (NTOWFv2, NTLMv2 response, session key derivation), `session.go` (Client handshake + optional signing/sealing). Every function is tested with MS-NLMP published vectors where available; no mocks, no external lab.
 
 **Tech Stack:** Go stdlib (`crypto/md5`, `crypto/rc4`, `crypto/hmac`, `encoding/binary`, `golang.org/x/crypto/md4` for NT hash, `unicode/utf16`).
 
@@ -15,18 +15,18 @@
 ## File Structure
 
 **Create:**
-- `internal/auth/ntlm/constants.go` — NegotiateFlags bitfield, MessageType enum, AV_PAIR ID enum, magic strings for key derivation, signature bytes.
-- `internal/auth/ntlm/avpair.go` — AV_PAIR encode/decode + TargetInfo map type.
-- `internal/auth/ntlm/avpair_test.go` — golden vectors for AV_PAIR list encode/decode.
-- `internal/auth/ntlm/message.go` — NEGOTIATE_MESSAGE, CHALLENGE_MESSAGE, AUTHENTICATE_MESSAGE struct types with `encode()` / `decodeXxx()` functions; SecurityBuffer helper type.
-- `internal/auth/ntlm/message_test.go` — encode/decode round-trip + MS-NLMP §4.2.1 vectors.
-- `internal/auth/ntlm/crypto.go` — `NTOWFv2`, `NTLMv2Response`, `LMv2Response`, `SessionBaseKey`, `KeyExchangeKey`, signing/sealing key derivation.
-- `internal/auth/ntlm/crypto_test.go` — MS-NLMP §4.2.4.1 golden vectors.
-- `internal/auth/ntlm/session.go` — `Client` struct with `Negotiate()`, `Authenticate(challenge []byte)`, `Sign(msg []byte)`, `Seal(msg []byte)`.
-- `internal/auth/ntlm/session_test.go` — end-to-end handshake with MS-NLMP §4.2.4 vectors; signing/sealing round-trips.
+- `internal/auth/ntlm/constants.go` - NegotiateFlags bitfield, MessageType enum, AV_PAIR ID enum, magic strings for key derivation, signature bytes.
+- `internal/auth/ntlm/avpair.go` - AV_PAIR encode/decode + TargetInfo map type.
+- `internal/auth/ntlm/avpair_test.go` - golden vectors for AV_PAIR list encode/decode.
+- `internal/auth/ntlm/message.go` - NEGOTIATE_MESSAGE, CHALLENGE_MESSAGE, AUTHENTICATE_MESSAGE struct types with `encode()` / `decodeXxx()` functions; SecurityBuffer helper type.
+- `internal/auth/ntlm/message_test.go` - encode/decode round-trip + MS-NLMP §4.2.1 vectors.
+- `internal/auth/ntlm/crypto.go` - `NTOWFv2`, `NTLMv2Response`, `LMv2Response`, `SessionBaseKey`, `KeyExchangeKey`, signing/sealing key derivation.
+- `internal/auth/ntlm/crypto_test.go` - MS-NLMP §4.2.4.1 golden vectors.
+- `internal/auth/ntlm/session.go` - `Client` struct with `Negotiate()`, `Authenticate(challenge []byte)`, `Sign(msg []byte)`, `Seal(msg []byte)`.
+- `internal/auth/ntlm/session_test.go` - end-to-end handshake with MS-NLMP §4.2.4 vectors; signing/sealing round-trips.
 
 **Modify:**
-- `go.mod` — add `golang.org/x/crypto` dependency.
+- `go.mod` - add `golang.org/x/crypto` dependency.
 
 **Not modifying in this plan:** `cmd/certigo/*` (no new subcommand), `CHANGELOG.md` (updated at end of M1 proper, not sub-milestone).
 
@@ -141,7 +141,7 @@ var (
 go build ./internal/auth/ntlm/...
 ```
 
-Expected: clean build, no errors (no test yet — this is pure constants).
+Expected: clean build, no errors (no test yet - this is pure constants).
 
 - [ ] **Step 3: Commit**
 
@@ -170,7 +170,7 @@ import (
 	"testing"
 )
 
-// MS-NLMP §4.2.4.1.3 — TargetInfo has NbDomainName="Domain", NbComputerName="Server".
+// MS-NLMP §4.2.4.1.3 - TargetInfo has NbDomainName="Domain", NbComputerName="Server".
 // Both strings are UTF-16-LE encoded. The serialized AV_PAIRS list ends with EOL (ID=0, len=0).
 func TestDecodeTargetInfoNLMPVector(t *testing.T) {
 	// hex: 02000c0044006f006d00610069006e0001000c005300650072007600650072000000
@@ -212,13 +212,13 @@ func TestEncodeTargetInfoRoundTrip(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test — expect failure**
+- [ ] **Step 2: Run test - expect failure**
 
 ```bash
 go test ./internal/auth/ntlm/...
 ```
 
-Expected: fails — `DecodeTargetInfo`, `TargetInfo`, `utf16LE` undefined.
+Expected: fails - `DecodeTargetInfo`, `TargetInfo`, `utf16LE` undefined.
 
 - [ ] **Step 3: Implement avpair.go**
 
@@ -313,7 +313,7 @@ func utf16LE(s string) []byte {
 }
 ```
 
-- [ ] **Step 4: Run test — expect pass**
+- [ ] **Step 4: Run test - expect pass**
 
 ```bash
 go test ./internal/auth/ntlm/...
@@ -372,7 +372,7 @@ func TestNTOWFv2Vector(t *testing.T) {
 	}
 }
 
-// MS-NLMP §4.2.4.1.2 + §4.2.4.1.3 — NTLMv2 response.
+// MS-NLMP §4.2.4.1.2 + §4.2.4.1.3 - NTLMv2 response.
 // Using MS-NLMP fixtures: responseKey=NTOWFv2 from above,
 // serverChallenge=0x0123456789abcdef, clientChallenge=0xaaaaaaaaaaaaaaaa,
 // timestamp=0x0000000000000000, targetInfo = {NbDomainName=Domain, NbComputerName=Server}.
@@ -420,7 +420,7 @@ func TestLMv2ResponseVector(t *testing.T) {
 	}
 }
 
-// MS-NLMP §4.2.4.2 — SessionBaseKey.
+// MS-NLMP §4.2.4.2 - SessionBaseKey.
 func TestSessionBaseKeyVector(t *testing.T) {
 	responseKey, _ := hex.DecodeString("0c868a403bfd7a93a3001ef22ef02e3f")
 	ntProofStr, _ := hex.DecodeString("68cd0ab851e51c96aabc927bebef6a1c")
@@ -432,13 +432,13 @@ func TestSessionBaseKeyVector(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: Run test — expect failure**
+- [ ] **Step 3: Run test - expect failure**
 
 ```bash
 go test ./internal/auth/ntlm/...
 ```
 
-Expected: fails — `NTOWFv2`, `NTLMv2Response`, `LMv2Response`, `SessionBaseKey` undefined.
+Expected: fails - `NTOWFv2`, `NTLMv2Response`, `LMv2Response`, `SessionBaseKey` undefined.
 
 - [ ] **Step 4: Implement crypto.go**
 
@@ -537,7 +537,7 @@ func buildTemp(timestamp, clientChallenge, targetInfo []byte) []byte {
 }
 ```
 
-- [ ] **Step 5: Run tests — expect pass**
+- [ ] **Step 5: Run tests - expect pass**
 
 ```bash
 go test ./internal/auth/ntlm/...
@@ -684,13 +684,13 @@ func leU32(b []byte) uint32 {
 }
 ```
 
-- [ ] **Step 2: Run test — expect failure**
+- [ ] **Step 2: Run test - expect failure**
 
 ```bash
 go test ./internal/auth/ntlm/...
 ```
 
-Expected: fails — `securityBuffer`, `NegotiateMessage`, `DecodeChallengeMessage` undefined.
+Expected: fails - `securityBuffer`, `NegotiateMessage`, `DecodeChallengeMessage` undefined.
 
 - [ ] **Step 3: Implement message.go**
 
@@ -753,7 +753,7 @@ func (m *NegotiateMessage) Encode() []byte {
 
 	// Fixed header ends here; we are at offset 32. The buf currently holds
 	// signature(8) + type(4) + flags(4) + secBuf(8) + secBuf(8) = 32. Good.
-	// But we haven't written Version — that's another 8 bytes, making the header 40.
+	// But we haven't written Version - that's another 8 bytes, making the header 40.
 	// Real NTLM libraries vary; our format here matches MS-NLMP strict (no version
 	// section unless NegotiateVersion flag set). Keep header at 32; payload starts at 32.
 	_ = wsOffset // silence staticcheck when workstation empty
@@ -883,7 +883,7 @@ func (m *AuthenticateMessage) Encode() []byte {
 }
 ```
 
-- [ ] **Step 4: Run tests — expect pass**
+- [ ] **Step 4: Run tests - expect pass**
 
 ```bash
 go test ./internal/auth/ntlm/...
@@ -987,7 +987,7 @@ func mustHex(s string) []byte {
 }
 ```
 
-- [ ] **Step 2: Run test — expect failure**
+- [ ] **Step 2: Run test - expect failure**
 
 ```bash
 go test ./internal/auth/ntlm/...
@@ -1031,7 +1031,7 @@ type Client struct {
 	seqClient         uint32
 	seqServer         uint32
 
-	// Test hooks — leave nil in production. Populated to deterministic values
+	// Test hooks - leave nil in production. Populated to deterministic values
 	// when reproducing MS-NLMP golden vectors.
 	fixedClientChallenge []byte // 8 bytes; nil = use crypto/rand
 	fixedTimestamp       []byte // 8 bytes; nil = use time.Now() as FILETIME
@@ -1210,7 +1210,7 @@ func windowsFiletime(t time.Time) []byte {
 }
 ```
 
-- [ ] **Step 4: Run tests — expect pass**
+- [ ] **Step 4: Run tests - expect pass**
 
 ```bash
 go test ./internal/auth/ntlm/...
@@ -1257,7 +1257,7 @@ Expected: green.
 - [ ] **Step 3: Tag alpha release**
 
 ```bash
-git tag -a v0.1.0-alpha1 -m "v0.1.0-alpha1 — M1a: pure-Go NTLMv2 client library"
+git tag -a v0.1.0-alpha1 -m "v0.1.0-alpha1 - M1a: pure-Go NTLMv2 client library"
 git push origin v0.1.0-alpha1
 ```
 
@@ -1279,10 +1279,10 @@ Expected: six archives + checksums.
 - "Used by LDAP signed binds, HTTP basic-auth alternative, RPC, relay" → library is generic (no LDAP/HTTP/RPC coupling); M1c/M1d/M7 consume it.
 - "~400 lines" spec estimate → actual ~600 LoC including tests.
 
-**2. Placeholder scan:** No TBDs, no "similar to Task N", no "add error handling" — every code block is concrete.
+**2. Placeholder scan:** No TBDs, no "similar to Task N", no "add error handling" - every code block is concrete.
 
 **3. Type consistency:** `NTOWFv2`, `NTLMv2Response`, `LMv2Response`, `SessionBaseKey` referenced in Task 5 are defined in Task 3 with matching signatures. `TargetInfo` / `DecodeTargetInfo` used in Task 4 defined in Task 2. `NegotiateMessage`, `ChallengeMessage`, `AuthenticateMessage`, `DecodeChallengeMessage` used in Task 5 defined in Task 4. `Signature`, `Negotiate*`, `AvID*`, `*MagicConstant` used across tasks defined in Task 1. All cross-references check out.
 
 **Risks noted:**
 - `windowsFiletime` precision: our test uses `fixedTimestamp = zeros`, so production time conversion is not covered by MS-NLMP golden vectors. If an interop issue emerges at M1c/M7, revisit.
-- MIC (Message Integrity Code) handling is stubbed — `AuthenticateMessage.MIC = nil` always. Some servers require MIC. If integration tests in M1c fail due to MIC, add a follow-up task.
+- MIC (Message Integrity Code) handling is stubbed - `AuthenticateMessage.MIC = nil` always. Some servers require MIC. If integration tests in M1c fail due to MIC, add a follow-up task.

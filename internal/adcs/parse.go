@@ -99,7 +99,7 @@ func parseTemplate(entry *goldap.Entry) (*Template, error) {
 		RawAttrs:                 rawAttrs(entry),
 	}
 
-	// Derived convenience flags — the underlying bits are defined in
+	// Derived convenience flags - the underlying bits are defined in
 	// internal/esc/flags.go but we re-check the relevant bit here so
 	// callers that don't import esc still see the booleans populated.
 	const (

@@ -2,7 +2,7 @@ package esc
 
 import "github.com/ajm4n/certigo/internal/adcs"
 
-// ESC2 — Template has "Any Purpose" EKU (or no EKU restriction) AND
+// ESC2 - Template has "Any Purpose" EKU (or no EKU restriction) AND
 // low-priv enrol. The resulting cert can be repurposed for client
 // authentication (or arbitrary uses) even without an explicit clientAuth
 // OID.
@@ -17,7 +17,7 @@ func (ESC2) Check(tpl *adcs.Template, _ *adcs.CertificateAuthority) []adcs.Findi
 		return nil
 	}
 	hasAnyPurpose := containsAny(tpl.EKUs, AnyPurposeEKUs)
-	// "No EKU restriction" — per MS-WCCE, an empty pkiExtendedKeyUsage
+	// "No EKU restriction" - per MS-WCCE, an empty pkiExtendedKeyUsage
 	// means the cert has no EKU constraint and is usable for any purpose.
 	noEKU := len(tpl.EKUs) == 0
 	if !hasAnyPurpose && !noEKU {

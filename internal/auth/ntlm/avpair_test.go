@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// MS-NLMP §4.2.4.1.3 — TargetInfo has NbDomainName="Domain", NbComputerName="Server".
+// MS-NLMP §4.2.4.1.3 - TargetInfo has NbDomainName="Domain", NbComputerName="Server".
 func TestDecodeTargetInfoNLMPVector(t *testing.T) {
 	raw := []byte{
 		0x02, 0x00, 0x0c, 0x00, 0x44, 0x00, 0x6f, 0x00, 0x6d, 0x00, 0x61, 0x00,

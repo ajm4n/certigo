@@ -2,7 +2,7 @@ package esc
 
 import "github.com/ajm4n/certigo/internal/adcs"
 
-// ESC16 — Template's issuance policy includes a universal-group OID
+// ESC16 - Template's issuance policy includes a universal-group OID
 // (an application policy / issuance policy OID that maps to a universal
 // group). Enrolment yields unintended universal-group membership in
 // authorization decisions.

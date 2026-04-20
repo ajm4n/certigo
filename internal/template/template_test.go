@@ -66,7 +66,7 @@ func TestBackupRestoreRoundTrip_Logic(t *testing.T) {
 			"1.3.6.1.5.2.3.4",
 			"1.3.6.1.4.1.311.20.2.2",
 		},
-		// Empty-slice sentinel — should survive round-trip as []string{}.
+		// Empty-slice sentinel - should survive round-trip as []string{}.
 		"msPKI-RA-Signature": {},
 	}
 
@@ -124,7 +124,7 @@ func TestVulnerableAttrs_ShapeCheck(t *testing.T) {
 		}
 	}
 
-	// Client Authentication EKU must be present — this is the bit that
+	// Client Authentication EKU must be present - this is the bit that
 	// makes an issued cert usable for PKINIT against the DC.
 	const clientAuthOID = "1.3.6.1.5.5.7.3.2"
 	foundClientAuth := false
@@ -152,7 +152,7 @@ func TestVulnerableAttrs_ShapeCheck(t *testing.T) {
 	}
 }
 
-// TestWrite_NilConnRejected guards the validate() path — Write with a
+// TestWrite_NilConnRejected guards the validate() path - Write with a
 // nil connection must fail fast rather than panic inside go-ldap.
 func TestWrite_NilConnRejected(t *testing.T) {
 	err := Write(Options{Name: "User", ConfigNC: "CN=Configuration,DC=x,DC=y"}, map[string][]string{"a": {"b"}})

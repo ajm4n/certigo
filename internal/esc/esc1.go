@@ -2,7 +2,7 @@ package esc
 
 import "github.com/ajm4n/certigo/internal/adcs"
 
-// ESC1 — Enrollee supplies subject + client-authentication EKU + low-priv
+// ESC1 - Enrollee supplies subject + client-authentication EKU + low-priv
 // principal holds Enroll right. Result: any low-priv user can request a
 // cert with an arbitrary Subject / UPN SAN usable for Kerberos PKINIT
 // impersonation.

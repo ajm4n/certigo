@@ -1,4 +1,4 @@
-// Package ca — MS-CSRA request and officer-rights operations layered on
+// Package ca - MS-CSRA request and officer-rights operations layered on
 // top of the DCOM binding in rpc.go.
 package ca
 
@@ -23,7 +23,7 @@ import (
 // Note: this does NOT pull the CA private key. Doing so requires the
 // multi-step BackupPrepare / BackupOpenFile / BackupReadFile flow
 // (MS-CSRA §3.1.4.1.14–18), which in turn requires DKMS-encrypted
-// key material and a shared key-archival secret — not feasible without
+// key material and a shared key-archival secret - not feasible without
 // first convincing the CA you are a holder of a Backup Operators token.
 // The returned *pki.Certificate has Key == nil; callers that need the
 // full key-pair should fall back to Certipy or, on the CA host itself,
@@ -256,7 +256,7 @@ func editOfficerDACL(sd, sidBin []byte, mask uint32, add bool) ([]byte, error) {
 
 	// Reassemble: pre || dacl || post. Patch DaclOffset to len(pre)
 	// because we placed the DACL immediately after the header / owner
-	// / group / SACL blocks — which is exactly where it lived before.
+	// / group / SACL blocks - which is exactly where it lived before.
 	newSD := make([]byte, 0, len(pre)+len(dacl)+len(post))
 	newSD = append(newSD, pre...)
 	newSD = append(newSD, dacl...)
@@ -340,7 +340,7 @@ func upsertAllowACE(acl, sidBin []byte, mask uint32) ([]byte, error) {
 
 // removeAllowACE strips the first ACCESS_ALLOWED_ACE whose SID matches
 // sidBin. The mask argument is accepted for symmetry with upsert but
-// not checked — AD CS treats officer ACEs as SID-keyed, and permissions
+// not checked - AD CS treats officer ACEs as SID-keyed, and permissions
 // are revoked wholesale.
 func removeAllowACE(acl, sidBin []byte, _ uint32) ([]byte, bool, error) {
 	if len(acl) < 8 {
@@ -388,7 +388,7 @@ func emptySelfRelativeSD() []byte {
 	return sd
 }
 
-// sidEqual is a constant-time-unsafe SID comparison — fine here because
+// sidEqual is a constant-time-unsafe SID comparison - fine here because
 // SIDs are public values.
 func sidEqual(a, b []byte) bool {
 	if len(a) != len(b) {

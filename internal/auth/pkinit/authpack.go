@@ -37,7 +37,7 @@ type dhDomainParameters struct {
 	G *big.Int
 }
 
-// authPack is the RFC 4556 §3.2.1 AuthPack — exactly the payload wrapped in
+// authPack is the RFC 4556 §3.2.1 AuthPack - exactly the payload wrapped in
 // CMS SignedData and inserted into the PA-PK-AS-REQ.
 type authPack struct {
 	PKAuthenticator   pkAuthenticator       `asn1:"explicit,tag:0"`
@@ -49,7 +49,7 @@ type authPack struct {
 // BuildAuthPack serializes an AuthPack for a PA-PK-AS-REQ. paChecksum MUST
 // be the SHA-1 digest computed over the DER-encoded KDC-REQ-BODY (RFC 4556
 // §3.2.1 step 1). The returned clientDHNonce is 16 random bytes that the
-// caller must persist — it is fed back into octetstring2key during AS-REP
+// caller must persist - it is fed back into octetstring2key during AS-REP
 // key derivation.
 func BuildAuthPack(dh DHParams, dhPub *big.Int, paChecksum []byte, nonce int32) ([]byte, []byte, error) {
 	if dh.P == nil || dh.G == nil {
@@ -59,7 +59,7 @@ func BuildAuthPack(dh DHParams, dhPub *big.Int, paChecksum []byte, nonce int32) 
 		return nil, nil, fmt.Errorf("pkinit: BuildAuthPack: nil DH public")
 	}
 
-	// Encode the DH parameters — PKCS#3 DHParameter form (SEQUENCE { p, g }).
+	// Encode the DH parameters - PKCS#3 DHParameter form (SEQUENCE { p, g }).
 	paramsDER, err := asn1.Marshal(dhDomainParameters{P: dh.P, G: dh.G})
 	if err != nil {
 		return nil, nil, fmt.Errorf("pkinit: encode DH params: %w", err)

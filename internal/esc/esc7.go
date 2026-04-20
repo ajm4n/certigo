@@ -2,7 +2,7 @@ package esc
 
 import "github.com/ajm4n/certigo/internal/adcs"
 
-// ESC7 — Manage-CA or Manage-Certificates rights held by a low-priv
+// ESC7 - Manage-CA or Manage-Certificates rights held by a low-priv
 // principal. Manage-CA permits granting oneself Manage-Certificates;
 // Manage-Certificates permits approving pending requests (bypassing the
 // "CA certificate manager approval" flag), enabling arbitrary issuance.

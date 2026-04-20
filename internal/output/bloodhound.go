@@ -12,7 +12,7 @@ import (
 
 // BloodHoundFormatter emits a BloodHound CE OpenGraph document describing the
 // ADCS escalation edges discovered by certigo. The schema follows the
-// SpecterOps BloodHound OpenGraph ingestion model — a single top-level
+// SpecterOps BloodHound OpenGraph ingestion model - a single top-level
 // object with "graph.nodes" and "graph.edges" arrays. Each edge's "kind" is
 // the ESC class (e.g. "ADCSESC1"), its "start" is the principal SID holding
 // the enrollment right, and its "end" is the CA that publishes the template.
@@ -155,7 +155,7 @@ func buildBloodHoundDoc(cas []*adcs.CertificateAuthority, templates []*adcs.Temp
 					})
 				}
 				if len(publishers) == 0 {
-					// No resolved CA — still emit a template-anchored edge so the
+					// No resolved CA - still emit a template-anchored edge so the
 					// finding is not silently dropped.
 					edges = append(edges, bhEdge{
 						Start: bhRef{Value: sid},

@@ -31,7 +31,7 @@ const oakleyGroup2PrimeHex = "" +
 	"FFFFFFFFFFFFFFFF"
 
 // Hex-encoded prime for RFC 3526 Group 14 (2048-bit MODP, generator 2).
-// More conservative — modern KDCs with heightened crypto policy may require
+// More conservative - modern KDCs with heightened crypto policy may require
 // at least this group.
 const rfc3526Group14PrimeHex = "" +
 	"FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1" +
@@ -76,7 +76,7 @@ func WellKnownGroup14() DHParams {
 
 // GeneratePrivate returns a fresh private exponent in [2, P-2]. For MODP
 // groups without an explicit subgroup order we treat the full interval as
-// admissible — Windows KDCs are happy with any full-length private.
+// admissible - Windows KDCs are happy with any full-length private.
 func (d DHParams) GeneratePrivate() (*big.Int, error) {
 	if d.P == nil {
 		return nil, errors.New("pkinit: DH params missing prime P")
@@ -93,14 +93,14 @@ func (d DHParams) GeneratePrivate() (*big.Int, error) {
 	return x.Add(x, big.NewInt(2)), nil
 }
 
-// PublicFrom returns g^priv mod p — the value transmitted to the peer as the
+// PublicFrom returns g^priv mod p - the value transmitted to the peer as the
 // client's DH public key.
 func (d DHParams) PublicFrom(priv *big.Int) *big.Int {
 	return new(big.Int).Exp(d.G, priv, d.P)
 }
 
 // SharedSecret returns peer^priv mod p, zero-padded on the left to len(P) in
-// bytes. The padding matches what RFC 4556 calls "DHSharedSecret" — every
+// bytes. The padding matches what RFC 4556 calls "DHSharedSecret" - every
 // participant produces an identically-sized octet string regardless of the
 // integer's leading-zero pattern.
 func (d DHParams) SharedSecret(peer, priv *big.Int) []byte {

@@ -65,7 +65,7 @@ func runAuth(f *authFlags) error {
 		return fmt.Errorf("auth: --dc-host required")
 	}
 
-	// Cert-based auth (PKINIT) — load the cert + key and perform the
+	// Cert-based auth (PKINIT) - load the cert + key and perform the
 	// AS-REQ/AS-REP exchange defined in RFC 4556.
 	if f.pfxPath != "" || (f.pemCert != "" && f.pemKey != "") {
 		return runPKINITAuth(f)

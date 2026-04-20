@@ -13,7 +13,7 @@
 //     round-trips. CAs that rotate connections aggressively may reject the
 //     AUTHENTICATE.
 //   - No NTLM signing / sealing ("MIC" enforcement on the target will break
-//     us — we do not rewrite tokens).
+//     us - we do not rewrite tokens).
 //   - No TLS channel-binding tokens. A CA with EPA enforced will refuse the
 //     relayed AUTHENTICATE.
 //   - One victim session at a time per source TCP endpoint; state is keyed
@@ -263,7 +263,7 @@ func (r *relay) handleAuthenticate(w http.ResponseWriter, req *http.Request, aut
 func (r *relay) newSession() *session {
 	jar, _ := cookiejar.New(nil)
 	tr := &http.Transport{
-		TLSClientConfig:     &tls.Config{InsecureSkipVerify: r.opts.Insecure}, // #nosec G402 — opt-in via --insecure
+		TLSClientConfig:     &tls.Config{InsecureSkipVerify: r.opts.Insecure}, // #nosec G402 - opt-in via --insecure
 		DisableKeepAlives:   false,
 		MaxIdleConnsPerHost: 2,
 		IdleConnTimeout:     30 * time.Second,

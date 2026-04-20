@@ -103,7 +103,7 @@ func ListOfficers(conn *goldap.Conn, configNC, caName string) ([]adcs.Ace, error
 }
 
 // LookupCADNSHostName queries LDAP for the pKIEnrollmentService.dNSHostName
-// attribute of caName — the canonical target for subsequent DCOM dialing.
+// attribute of caName - the canonical target for subsequent DCOM dialing.
 // Returns ("", nil) when the attribute is absent so callers can fall back
 // to a --ca-host override without treating the missing value as an error.
 func LookupCADNSHostName(conn *goldap.Conn, configNC, caName string) (string, error) {

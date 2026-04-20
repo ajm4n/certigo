@@ -16,7 +16,7 @@ import (
 func buildFixture(t *testing.T) ([]*adcs.CertificateAuthority, []*adcs.Template) {
 	t.Helper()
 	cert := &x509.Certificate{
-		Raw:          []byte{0x30, 0x82, 0x00, 0x01}, // not a real DER cert — just non-empty bytes
+		Raw:          []byte{0x30, 0x82, 0x00, 0x01}, // not a real DER cert - just non-empty bytes
 		SerialNumber: big.NewInt(0xdeadbeef),
 		Subject:      pkix.Name{CommonName: "CORP-CA"},
 		NotBefore:    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),

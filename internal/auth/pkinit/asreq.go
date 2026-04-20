@@ -59,7 +59,7 @@ type Result struct {
 //
 // gokrb5 v8's *client.Client exposes no public setter for the sessions map
 // or credential secret material, so the returned Client is a thin wrapper
-// that only carries Credentials and Config — the real TGT/sessionKey pair
+// that only carries Credentials and Config - the real TGT/sessionKey pair
 // lives in the Result fields and can be written to ccache via
 // SavePKINITTGTToCCache.
 func AuthenticateWithPKINIT(opts Options) (*client.Client, error) {
@@ -101,7 +101,7 @@ func authenticateWithPKINIT(opts Options) (*Result, error) {
 	// KDC options: canonicalize + forwardable + renewable, matching what
 	// Impacket's gettgtpkinit.py sends. The RequestPAC flag is communicated
 	// via pa-data of type PA_PAC_REQUEST rather than KDC options, but we
-	// make no effort to strip PAC requests — Windows always issues PACs.
+	// make no effort to strip PAC requests - Windows always issues PACs.
 	if opts.RequestPAC {
 		asReq.PAData = append(asReq.PAData, buildPACRequestPA())
 	}
@@ -115,7 +115,7 @@ func authenticateWithPKINIT(opts Options) (*Result, error) {
 		etypeID.AES256_CTS_HMAC_SHA1_96,
 		etypeID.AES128_CTS_HMAC_SHA1_96,
 	}
-	// A fresh nonce — also chained into the AuthPack PKAuthenticator so
+	// A fresh nonce - also chained into the AuthPack PKAuthenticator so
 	// the KDC can correlate the reply.
 	nonce := asReq.ReqBody.Nonce
 
@@ -280,7 +280,7 @@ func validateOptions(opts *Options) error {
 // KDCs silently ignore it.
 func buildPACRequestPA() types.PAData {
 	// PA-PAC-REQUEST ::= SEQUENCE { include-pac [0] BOOLEAN --# true if PAC
-	// requested --} — we always emit the positive form.
+	// requested --} - we always emit the positive form.
 	type pacRequest struct {
 		IncludePAC bool `asn1:"explicit,tag:0"`
 	}
@@ -293,7 +293,7 @@ func buildPACRequestPA() types.PAData {
 
 // sendAS resolves the first KDC under opts.Config for realm, then sends
 // reqBytes as a length-prefixed TCP packet (RFC 4120 §7.2.2). We skip UDP
-// entirely — PKINIT messages routinely exceed the EDNS0 threshold and all
+// entirely - PKINIT messages routinely exceed the EDNS0 threshold and all
 // modern KDCs accept TCP on 88.
 func sendAS(cfg *config.Config, realm string, reqBytes []byte) ([]byte, error) {
 	addr, err := resolveKDC(cfg, realm)

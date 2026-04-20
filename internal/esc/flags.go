@@ -7,7 +7,7 @@ const (
 	CTFlagEnrolleeSuppliesSubjectAltName uint32 = 0x00010000
 	// CTFlagNoSecurityExtension, when set, suppresses the
 	// szOID_NTDS_CA_SECURITY_EXT (1.3.6.1.4.1.311.25.2) SID-binding
-	// extension — the prerequisite for ESC9.
+	// extension - the prerequisite for ESC9.
 	CTFlagNoSecurityExtension uint32 = 0x80000000
 )
 
@@ -50,6 +50,6 @@ var ClientAuthEKUs = []string{
 	"2.5.29.37.0",            // anyExtendedKeyUsage
 }
 
-// CertRequestAgentEKU is the "Certificate Request Agent" EKU — when present
+// CertRequestAgentEKU is the "Certificate Request Agent" EKU - when present
 // in a template that a low-priv user can enrol, ESC3 applies.
 const CertRequestAgentEKU = "1.3.6.1.4.1.311.20.2.1"

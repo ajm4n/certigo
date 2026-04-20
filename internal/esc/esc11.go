@@ -2,7 +2,7 @@ package esc
 
 import "github.com/ajm4n/certigo/internal/adcs"
 
-// ESC11 — The CA does not require ICPR packet encryption
+// ESC11 - The CA does not require ICPR packet encryption
 // (IF_ENFORCEENCRYPTICERTREQUEST is not set on the CA's interface
 // flags). An unauthenticated attacker on the network path can relay /
 // replay request RPC traffic.
@@ -17,7 +17,7 @@ func (ESC11) Check(tpl *adcs.Template, ca *adcs.CertificateAuthority) []adcs.Fin
 		return nil
 	}
 	if ca.Flags&CAFlagEnforceEncryptICertRequest != 0 {
-		return nil // enforcement is on — not vulnerable
+		return nil // enforcement is on - not vulnerable
 	}
 	// Require that ca.Flags was actually populated; a zero value that
 	// reflects "we didn't read the flags" would create false positives.

@@ -19,7 +19,7 @@ import (
 // *client.Client) because gokrb5's client has no way to accept
 // externally-acquired session material.
 //
-// The written file contains exactly one credential — the TGT — with server
+// The written file contains exactly one credential - the TGT - with server
 // = krbtgt/REALM@REALM, session key = dep.Key, and the ticket flags /
 // lifetimes verbatim from the decrypted AS-REP.
 func SavePKINITTGTToCCache(path string, cname types.PrincipalName, realm string, tkt messages.Ticket, dep messages.EncKDCRepPart) error {

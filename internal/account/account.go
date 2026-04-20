@@ -27,7 +27,7 @@ const (
 )
 
 // Options bundles every knob the account package needs. Not all fields are
-// meaningful for every action — e.g. Type only applies to Create, SPNs /
+// meaningful for every action - e.g. Type only applies to Create, SPNs /
 // UPN / DNSHost only apply to Create or Update.
 type Options struct {
 	Conn        *goldap.Conn
@@ -196,7 +196,7 @@ func Delete(opts Options) error {
 }
 
 // Read dumps every attribute on the target object. Values are returned as
-// strings — callers needing raw bytes should drop to ldap.Search directly.
+// strings - callers needing raw bytes should drop to ldap.Search directly.
 func Read(opts Options) (map[string][]string, error) {
 	if opts.Conn == nil {
 		return nil, fmt.Errorf("account: read: nil connection")

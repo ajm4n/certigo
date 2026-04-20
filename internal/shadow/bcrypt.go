@@ -14,7 +14,7 @@ const bcryptRSAPublicMagic uint32 = 0x31415352
 
 // bcryptRSAHeaderLen is the fixed 24-byte header at the start of a
 // BCRYPT_RSAKEY_BLOB: Magic, BitLength, PublicExponentSize, ModulusSize,
-// Prime1Size, Prime2Size — six 32-bit little-endian fields.
+// Prime1Size, Prime2Size - six 32-bit little-endian fields.
 const bcryptRSAHeaderLen = 24
 
 // EncodeRSABcryptBlob serializes a BCRYPT_RSAKEY_BLOB describing the public
@@ -53,7 +53,7 @@ func EncodeRSABcryptBlob(pub *rsa.PublicKey) []byte {
 
 // DecodeRSABcryptBlob parses a BCRYPT_RSAKEY_BLOB and returns the decoded
 // public exponent (as an int) and the raw modulus bytes. Private-key
-// material (Prime1 / Prime2 / etc.) is ignored — shadow credentials only
+// material (Prime1 / Prime2 / etc.) is ignored - shadow credentials only
 // carry the public key portion.
 func DecodeRSABcryptBlob(blob []byte) (exponent int, modulus []byte, err error) {
 	if len(blob) < bcryptRSAHeaderLen {

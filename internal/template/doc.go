@@ -10,10 +10,10 @@
 //
 // Shape mirrors Certipy's certipy/commands/template.py:
 //
-//  1. Read  — return every LDAP attribute of the target template entry.
-//  2. Write — apply a map[attr][]value REPLACE delta via ldap.ModifyRequest.
-//  3. Backup — JSON-marshal the full attribute set for later rollback.
-//  4. Restore — apply a previously-captured Backup blob.
+//  1. Read  - return every LDAP attribute of the target template entry.
+//  2. Write - apply a map[attr][]value REPLACE delta via ldap.ModifyRequest.
+//  3. Backup - JSON-marshal the full attribute set for later rollback.
+//  4. Restore - apply a previously-captured Backup blob.
 //
 // A helper VulnerableAttrs returns the exact ms-PKI flag values Certipy
 // writes when "making" a template vulnerable; the integer constants are

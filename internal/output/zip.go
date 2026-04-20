@@ -31,7 +31,7 @@ func init() { register(ZipFormatter{}) }
 func (ZipFormatter) Format(w io.Writer, cas []*adcs.CertificateAuthority, templates []*adcs.Template) error {
 	zw := zip.NewWriter(w)
 
-	// 1. certigo_find.txt — the text report.
+	// 1. certigo_find.txt - the text report.
 	var textBuf bytes.Buffer
 	if err := (TextFormatter{}).Format(&textBuf, cas, templates); err != nil {
 		return fmt.Errorf("output/zip: render text: %w", err)
@@ -40,7 +40,7 @@ func (ZipFormatter) Format(w io.Writer, cas []*adcs.CertificateAuthority, templa
 		return err
 	}
 
-	// 2. certigo_find.json — the JSON report.
+	// 2. certigo_find.json - the JSON report.
 	var jsonBuf bytes.Buffer
 	if err := (JSONFormatter{}).Format(&jsonBuf, cas, templates); err != nil {
 		return fmt.Errorf("output/zip: render json: %w", err)
@@ -49,7 +49,7 @@ func (ZipFormatter) Format(w io.Writer, cas []*adcs.CertificateAuthority, templa
 		return err
 	}
 
-	// 3. ca/<name>.crt — one DER cert per CA that has a Certificate.
+	// 3. ca/<name>.crt - one DER cert per CA that has a Certificate.
 	for _, ca := range cas {
 		if ca == nil || ca.Certificate == nil {
 			continue
@@ -60,7 +60,7 @@ func (ZipFormatter) Format(w io.Writer, cas []*adcs.CertificateAuthority, templa
 		}
 	}
 
-	// 4. templates/<name>.json — one JSON blob per template.
+	// 4. templates/<name>.json - one JSON blob per template.
 	for _, t := range templates {
 		if t == nil {
 			continue

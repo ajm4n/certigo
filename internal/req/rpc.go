@@ -23,7 +23,7 @@ import (
 //
 // The RPC binding uses SPNEGO preferring Kerberos, falling back to NTLM. The
 // CA's ICPR endpoint is dynamic and discovered via the endpoint mapper (epm)
-// at port 135 — no explicit endpoint option is passed.
+// at port 135 - no explicit endpoint option is passed.
 func submitRPC(opts Options) (*pki.Certificate, error) {
 	if opts.CA == "" {
 		return nil, fmt.Errorf("req: --ca required")

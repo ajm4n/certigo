@@ -81,7 +81,7 @@ func VulnerableAttrs() map[string][]string {
 }
 
 // Read returns the raw LDAP attribute map of the template identified by
-// opts.Name. The returned map is a deep copy — callers may mutate it
+// opts.Name. The returned map is a deep copy - callers may mutate it
 // freely without affecting server state.
 //
 // All attributes are returned (filter "(objectClass=*)" at ScopeBase),
@@ -115,7 +115,7 @@ func Read(opts Options) (map[string][]string, error) {
 // entry becomes a REPLACE modification (RFC 4511 operation 2); passing an
 // empty slice for a key requests attribute removal (DELETE operation).
 //
-// Keys are LDAP attribute names — for example "msPKI-Certificate-Name-Flag",
+// Keys are LDAP attribute names - for example "msPKI-Certificate-Name-Flag",
 // "pKIExtendedKeyUsage", "msPKI-Enrollment-Flag".
 func Write(opts Options, attrs map[string][]string) error {
 	if err := opts.validate(); err != nil {

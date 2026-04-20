@@ -1,4 +1,4 @@
-// Package account implements Certipy's `account` subcommand — creation,
+// Package account implements Certipy's `account` subcommand - creation,
 // modification, deletion, and read-back of Active Directory user and
 // computer accounts over LDAP.
 //

@@ -36,7 +36,7 @@ type marshalKRBCred struct {
 
 // ReadKirbi parses a .kirbi file (DER-encoded KRB_CRED) at path and returns
 // the unmarshaled message. The EncryptedPart is typically stored with
-// etype 0 (plaintext) by Rubeus/Mimikatz — we pass it through verbatim.
+// etype 0 (plaintext) by Rubeus/Mimikatz - we pass it through verbatim.
 func ReadKirbi(path string) (*messages.KRBCred, error) {
 	if path == "" {
 		return nil, errors.New("krb: kirbi path required")
@@ -112,7 +112,7 @@ func marshalKirbi(cred *messages.KRBCred) ([]byte, error) {
 
 // marshalEncKrbCredPart produces the DER encoding of an EncKrbCredPart
 // suitable for embedding as the cipher payload of a plaintext-etype (0)
-// KRB_CRED enc-part — the shape Mimikatz/Rubeus emit.
+// KRB_CRED enc-part - the shape Mimikatz/Rubeus emit.
 func marshalEncKrbCredPart(p messages.EncKrbCredPart) ([]byte, error) {
 	b, err := asn1.Marshal(p)
 	if err != nil {
@@ -122,7 +122,7 @@ func marshalEncKrbCredPart(p messages.EncKrbCredPart) ([]byte, error) {
 }
 
 // isTGT reports whether the given server principal looks like a krbtgt
-// TGS — i.e. a two-component name starting with "krbtgt". This is how
+// TGS - i.e. a two-component name starting with "krbtgt". This is how
 // ccache entries for TGTs are identified without consulting the realm.
 func isTGT(server types.PrincipalName) bool {
 	return len(server.NameString) >= 1 && server.NameString[0] == "krbtgt"
@@ -224,7 +224,7 @@ func KirbiToCCache(cred *messages.KRBCred) (*credentials.CCache, error) {
 	// Recover session key / times / flags from the EncKrbCredPart when
 	// present. Rubeus/Mimikatz store this in plaintext (etype 0), so we can
 	// decode the cipher bytes directly without a key. If that fails we fall
-	// back to zero-valued data — the ticket itself is the load-bearing
+	// back to zero-valued data - the ticket itself is the load-bearing
 	// field for most downstream consumers.
 	var (
 		sessionKey types.EncryptionKey

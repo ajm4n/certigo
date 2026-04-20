@@ -153,7 +153,7 @@ func runCA(f *caFlags) error {
 	case f.backup, f.addOfficer != "", f.removeOfficer != "", f.issueRequest > 0, f.denyRequest > 0:
 		return runCARPC(f, conn, configNC, creds)
 	default:
-		return fmt.Errorf("ca: no action specified — see --list-templates, --add-template, --disable-template, --list-officers")
+		return fmt.Errorf("ca: no action specified - see --list-templates, --add-template, --disable-template, --list-officers")
 	}
 	return nil
 }
@@ -161,7 +161,7 @@ func runCA(f *caFlags) error {
 // runCARPC handles the DCOM-backed subcommands. It resolves the CA's
 // dNSHostName (preferring --ca-host when supplied), dials DCOM, and
 // dispatches the selected operation. Credentials are reused from the
-// LDAP stage — hash-bound creds take precedence over password-bound.
+// LDAP stage - hash-bound creds take precedence over password-bound.
 func runCARPC(f *caFlags, conn *goldapConn, configNC string, creds *auth.Credentials) error {
 	host := strings.TrimSpace(f.caHost)
 	if host == "" {
@@ -172,7 +172,7 @@ func runCARPC(f *caFlags, conn *goldapConn, configNC string, creds *auth.Credent
 		host = resolved
 	}
 	if host == "" {
-		return fmt.Errorf("ca: could not resolve CA DNS hostname — pass --ca-host")
+		return fmt.Errorf("ca: could not resolve CA DNS hostname - pass --ca-host")
 	}
 
 	user := creds.Username
@@ -226,7 +226,7 @@ func runCARPC(f *caFlags, conn *goldapConn, configNC string, creds *auth.Credent
 		}
 		note := ""
 		if cert.Key == nil {
-			note = " (cert only — private key requires BackupPrepare flow; use certutil -backupkey on the CA host)"
+			note = " (cert only - private key requires BackupPrepare flow; use certutil -backupkey on the CA host)"
 		}
 		fmt.Printf("wrote %d bytes of CA signing material%s to %s\n", len(blob), note, out)
 	case f.issueRequest > 0:

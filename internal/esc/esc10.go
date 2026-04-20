@@ -2,7 +2,7 @@ package esc
 
 import "github.com/ajm4n/certigo/internal/adcs"
 
-// ESC10 — DC has StrongCertificateBindingEnforcement weak (== 0) OR
+// ESC10 - DC has StrongCertificateBindingEnforcement weak (== 0) OR
 // CertificateMappingMethods allows weak UPN/implicit mapping, combined
 // with a template that allows the requester to dictate the SAN/UPN.
 //

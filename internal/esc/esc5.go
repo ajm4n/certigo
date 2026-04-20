@@ -2,7 +2,7 @@ package esc
 
 import "github.com/ajm4n/certigo/internal/adcs"
 
-// ESC5 — Writable PKI object paths (CA cert, AIA container, NTAuthStore,
+// ESC5 - Writable PKI object paths (CA cert, AIA container, NTAuthStore,
 // root trust). These are object-level issues that live outside the
 // per-template scope. The Rule below is a no-op placeholder so the
 // coverage matrix is explicit and the scan registry has a stable entry;
