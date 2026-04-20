@@ -18,6 +18,11 @@ linters:
       - path: _test\.go
         linters:
           - errcheck
+      # MD4 is required for NT hash per MS-NLMP. No replacement exists.
+      - path: internal/auth/ntlm/
+        text: "SA1019.*md4"
+        linters:
+          - staticcheck
 
 formatters:
   enable:
