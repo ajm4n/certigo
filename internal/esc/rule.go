@@ -24,6 +24,10 @@ func AllRules() []Rule {
 		ESC1{},
 		ESC2{},
 		ESC3{},
+		ESC4{},
+		ESC5{},
+		ESC6{},
+		ESC7{},
 	}
 }
 
