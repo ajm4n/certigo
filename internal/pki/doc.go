@@ -5,5 +5,3 @@
 // (including UPN-in-SAN for AD CS enrollment). Higher-level features like
 // certificate forging or Schannel TLS are in other packages.
 package pki
-
-import _ "software.sslmate.com/src/go-pkcs12"
