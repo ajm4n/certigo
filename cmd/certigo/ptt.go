@@ -46,20 +46,18 @@ func runPtt(f *pttFlags) error {
 	}
 
 	if f.kirbiPath != "" {
-		// Round-trip through our kirbi codec to validate the input parses.
-		if _, err := krb.ReadKirbi(f.kirbiPath); err != nil {
+		cred, err := krb.ReadKirbi(f.kirbiPath)
+		if err != nil {
 			return fmt.Errorf("ptt: read kirbi: %w", err)
 		}
-		// NOTE: kirbi → MIT ccache marshaling is not yet implemented.
-		// Copy the kirbi bytes verbatim; caller can use a .kirbi-aware consumer.
-		data, err := os.ReadFile(f.kirbiPath)
+		raw, err := krb.KirbiToCCacheBytes(cred)
 		if err != nil {
+			return fmt.Errorf("ptt: kirbi->ccache: %w", err)
+		}
+		if err := os.WriteFile(out, raw, 0o600); err != nil {
 			return err
 		}
-		if err := os.WriteFile(out, data, 0o600); err != nil {
-			return err
-		}
-		fmt.Printf("kirbi copied to %s (full ccache conversion pending)\n", out)
+		fmt.Printf("ticket written to %s\n", out)
 		return nil
 	}
 

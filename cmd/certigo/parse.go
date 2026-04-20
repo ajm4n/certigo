@@ -1,15 +1,18 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"path/filepath"
-	"strings"
+	"sort"
 
 	"github.com/spf13/cobra"
+
+	"github.com/ajm4n/certigo/internal/parse"
 )
 
 type parseFlags struct {
-	file string
+	file   string
+	format string
 }
 
 func newParseCmd() *cobra.Command {
@@ -21,7 +24,8 @@ func newParseCmd() *cobra.Command {
 			return runParse(f)
 		},
 	}
-	cmd.Flags().StringVar(&f.file, "file", "", "input file (.evtx or .reg) — required")
+	cmd.Flags().StringVar(&f.file, "file", "", "input file (.reg or .evtx)")
+	cmd.Flags().StringVar(&f.format, "format", "text", "output format: text|json")
 	return cmd
 }
 
@@ -29,13 +33,29 @@ func runParse(f *parseFlags) error {
 	if f.file == "" {
 		return fmt.Errorf("parse: --file required")
 	}
-	ext := strings.ToLower(filepath.Ext(f.file))
-	switch ext {
-	case ".evtx":
-		return fmt.Errorf("parse: EVTX parsing not yet implemented — use Certipy's parse command for EVTX until a pure-Go library lands")
-	case ".reg":
-		return fmt.Errorf("parse: registry (.reg) parsing not yet implemented — use Certipy's parse command in the meantime")
-	default:
-		return fmt.Errorf("parse: unknown file extension %q (want .evtx or .reg)", ext)
+	events, err := parse.ParseFile(f.file)
+	if err != nil {
+		return err
 	}
+	switch f.format {
+	case "json":
+		out, _ := json.MarshalIndent(events, "", "  ")
+		fmt.Println(string(out))
+	default:
+		for _, e := range events {
+			fmt.Printf("== %s\n", e.Fields["_path"])
+			keys := make([]string, 0, len(e.Fields))
+			for k := range e.Fields {
+				if k == "_path" {
+					continue
+				}
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, k := range keys {
+				fmt.Printf("  %s = %s\n", k, e.Fields[k])
+			}
+		}
+	}
+	return nil
 }

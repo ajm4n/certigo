@@ -291,3 +291,71 @@ func KirbiToCCache(cred *messages.KRBCred) (*credentials.CCache, error) {
 	}
 	return cc, nil
 }
+
+// KirbiToCCacheBytes converts a KRB-CRED message to raw MIT ccache v4 bytes.
+// Equivalent to KirbiToCCache then re-marshaling, but skips the round-trip
+// through gokrb5's CCache type. Useful for writing a ccache file directly.
+func KirbiToCCacheBytes(cred *messages.KRBCred) ([]byte, error) {
+	if cred == nil {
+		return nil, errors.New("krb: nil KRBCred")
+	}
+	if len(cred.Tickets) == 0 {
+		return nil, errors.New("krb: KRBCred has no tickets")
+	}
+
+	tkt := cred.Tickets[0]
+	var (
+		sessionKey types.EncryptionKey
+		flags      asn1.BitString
+		authTime   time.Time
+		startTime  time.Time
+		endTime    time.Time
+		renewTill  time.Time
+		clientName types.PrincipalName
+		clientReal string
+	)
+	if cred.EncPart.EType == 0 && len(cred.EncPart.Cipher) > 0 {
+		if p, err := unmarshalEncKrbCredPart(cred.EncPart.Cipher); err == nil && len(p.TicketInfo) > 0 {
+			info := p.TicketInfo[0]
+			sessionKey = info.Key
+			flags = info.Flags
+			authTime = info.AuthTime
+			startTime = info.StartTime
+			endTime = info.EndTime
+			renewTill = info.RenewTill
+			clientName = info.PName
+			clientReal = info.PRealm
+		}
+	}
+	if clientReal == "" {
+		clientReal = tkt.Realm
+	}
+	if len(clientName.NameString) == 0 {
+		clientName = types.PrincipalName{NameType: nametype.KRB_NT_UNKNOWN}
+	}
+	tktBytes, err := tkt.Marshal()
+	if err != nil {
+		return nil, fmt.Errorf("krb: marshal ticket: %w", err)
+	}
+
+	var buf bytes.Buffer
+	buf.WriteByte(0x05)
+	buf.WriteByte(0x04)
+	writeUint16BE(&buf, 0)
+
+	writePrincipal(&buf, clientName, clientReal)
+	writePrincipal(&buf, clientName, clientReal)
+	writePrincipal(&buf, tkt.SName, tkt.Realm)
+	writeKey(&buf, sessionKey)
+	writeUint32BE(&buf, uint32(authTime.Unix()))
+	writeUint32BE(&buf, uint32(startTime.Unix()))
+	writeUint32BE(&buf, uint32(endTime.Unix()))
+	writeUint32BE(&buf, uint32(renewTill.Unix()))
+	buf.WriteByte(0)
+	writeTicketFlags(&buf, flags)
+	writeUint32BE(&buf, 0)
+	writeUint32BE(&buf, 0)
+	writeData(&buf, tktBytes)
+	writeData(&buf, nil)
+	return buf.Bytes(), nil
+}

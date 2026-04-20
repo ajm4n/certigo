@@ -11,7 +11,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -51,13 +50,11 @@ func Submit(opts Options) (*pki.Certificate, error) {
 	case MethodWeb, "":
 		return submitWeb(opts)
 	case MethodRPC:
-		return nil, ErrUnimplementedRPC
+		return submitRPC(opts)
 	default:
 		return nil, fmt.Errorf("req: unknown method %q", opts.Method)
 	}
 }
-
-var ErrUnimplementedRPC = errors.New("req: ICPR RPC submit not yet implemented — use --method web")
 
 func submitWeb(opts Options) (*pki.Certificate, error) {
 	if opts.CA == "" {
