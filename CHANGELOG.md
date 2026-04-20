@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-20
+
+### Added
+- **`certigo req`** — HTTP `/certsrv/` enrollment with Basic auth over TLS (NTLM/Kerberos over HTTP pending). Full CSR generation + PFX export.
+- **`certigo ca`** — LDAP-backed `--add-template`, `--disable-template`, `--list-templates`, `--list-officers` (uses `adcs.ParseSecurityDescriptor`). RPC (backup/approve/deny/officer-edit) stubbed with `ErrRPCUnimplemented` pending go-msrpc ICertAdminD2 bindings.
+- **`certigo relay`** — HTTP(S) listener skeleton with `--trigger {petitpotam|dfscoerce|printerbug}`. Full NTLM forwarding pipeline and coercion RPC triggers return `ErrUnimplemented` pending MS-EFSR / MS-DFSNM / MS-RPRN bindings.
+- `internal/req`, `internal/ca`, `internal/coerce`, `internal/relay` packages.
+
+### Status
+All 12 Certipy subcommands now have **real Cobra wiring and runnable CLI surface**. Every subcommand either does real work or returns a clear "not yet implemented" message with a pointer to the blocking dependency (typically MS-RPC bindings via go-msrpc).
+
 ## [0.2.0] - 2026-04-20
 
 ### Added
