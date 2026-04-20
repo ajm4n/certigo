@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.1.0-alpha3] - 2026-04-20
+
+### Added
+- `internal/auth/krb` — Kerberos wrapper around `jcmturner/gokrb5/v8`: `LoadConfig` (KRB5CONF / `/etc/krb5.conf` / synthesized-in-memory), `NewClient` (password + NT-hash paths), `GetTGT`, `GetTGTFromCCache`, `SaveTGTToCCache` (hand-written MIT ccache v4 marshaler).
+- `internal/auth/krb` kirbi codec — `ReadKirbi`, `WriteKirbi`, `CCacheToKirbi`, `KirbiToCCache` (ASN.1 KRB_CRED / EncKrbCredPart via gokrb5 messages).
+- `internal/auth/spnego` — `Negotiator` interface with NTLM (`NewNTLM`) and gokrb5-backed Kerberos (`NewKerberos`) implementations; reusable across LDAP, HTTP, RPC.
+- `internal/ldap` — `Dial` + credential-driven `Bind` selecting Simple / NTLM / `NTLMBindWithHash` / GSSAPI-SPNEGO based on `Credentials`. Cert-based LDAPS deferred to M3.
+
+### Changed
+- Go toolchain bumped to 1.24 (gokrb5 dep chain requirement).
+- CI and goreleaser workflows updated to Go 1.24.
+
 ## [0.1.0-alpha2] - 2026-04-20
 
 ### Added
