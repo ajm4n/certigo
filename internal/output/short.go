@@ -77,7 +77,7 @@ func (ShortFormatter) Format(w io.Writer, cas []*adcs.CertificateAuthority, temp
 	}
 
 	tw = tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintln(tw, header("TEMPLATE\tPUBLISHED-ON\tENABLED\tVULN\tENROLL\tESCs", tty)); err != nil {
+	if _, err := fmt.Fprintln(tw, header("TEMPLATE\tENABLED\tVULN\tENROLL\tESCs\tPUBLISHED-ON", tty)); err != nil {
 		return err
 	}
 
@@ -93,27 +93,36 @@ func (ShortFormatter) Format(w io.Writer, cas []*adcs.CertificateAuthority, temp
 
 	for _, t := range rows {
 		name := templateLabel(t)
-		pub := "-"
-		if len(t.PublishedBy) > 0 {
-			pub = strings.Join(t.PublishedBy, ",")
-		}
-		escs := escKinds(t.Findings)
 		escCol := "-"
-		if escs != "" {
-			escCol = escs
+		if kinds := escKinds(t.Findings); kinds != "" {
+			escCol = kinds
 		}
 		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			name,
-			pub,
 			yesNoShort(t.Enabled),
 			yesNoShort(len(t.Findings) > 0),
 			yesNoShort(t.EnrollableByCurrentUser),
 			escCol,
+			compactPublishedBy(t.PublishedBy),
 		); err != nil {
 			return err
 		}
 	}
 	return tw.Flush()
+}
+
+// compactPublishedBy keeps the PUBLISHED-ON column from ballooning when a
+// template is published on every CA. Shows the first name verbatim and
+// appends a "(+N more)" suffix for the rest. A template published on
+// exactly one CA prints that CA name; an unpublished template prints "-".
+func compactPublishedBy(pubs []string) string {
+	if len(pubs) == 0 {
+		return "-"
+	}
+	if len(pubs) == 1 {
+		return pubs[0]
+	}
+	return fmt.Sprintf("%s (+%d more)", pubs[0], len(pubs)-1)
 }
 
 func templateLabel(t *adcs.Template) string {
