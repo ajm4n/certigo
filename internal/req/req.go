@@ -13,13 +13,28 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/ajm4n/certigo/internal/pki"
 )
+
+// Debug causes req to dump HTTP request / response metadata to stderr
+// when true. Toggled by the CLI --debug flag.
+var Debug bool
+
+// Timeout caps every HTTP round trip in submitWeb. Default is 30s.
+var Timeout = 30 * time.Second
+
+// progf writes a certipy-style [*] progress line to stderr.
+func progf(tag, format string, args ...any) {
+	_, _ = fmt.Fprintf(os.Stderr, "%s %s\n", tag, fmt.Sprintf(format, args...))
+}
 
 type Method string
 
@@ -44,13 +59,15 @@ type Options struct {
 }
 
 // Submit generates a key + CSR, submits via the chosen method, and returns
-// the issued *pki.Certificate.
+// the issued *pki.Certificate. The default method is RPC (ICPR / MS-WCCE)
+// which matches Certipy's default; use --method web to force the
+// /certsrv/ HTTP flow.
 func Submit(opts Options) (*pki.Certificate, error) {
 	switch opts.Method {
-	case MethodWeb, "":
-		return submitWeb(opts)
-	case MethodRPC:
+	case MethodRPC, "":
 		return submitRPC(opts)
+	case MethodWeb:
+		return submitWeb(opts)
 	default:
 		return nil, fmt.Errorf("req: unknown method %q", opts.Method)
 	}
@@ -114,10 +131,25 @@ func postCertSrv(opts Options, csrDER []byte) (*x509.Certificate, error) {
 	}
 	base = strings.TrimSuffix(base, "/")
 
+	// If the host portion parses as an IP, auto-enable InsecureSkipVerify
+	// because the CA's cert will be for the DNS name, not the IP.
+	if u, err := url.Parse(base); err == nil {
+		if ip := net.ParseIP(u.Hostname()); ip != nil && !opts.TLSInsecure {
+			progf("[!]", "host %s is an IP; auto-enabling --insecure-tls", ip)
+			opts.TLSInsecure = true
+		}
+	}
+
+	progf("[*]", "connecting to %s (timeout %s)", base, Timeout)
+	transport := &http.Transport{
+		TLSClientConfig:   &tls.Config{InsecureSkipVerify: opts.TLSInsecure}, // #nosec G402 - opt-in via --insecure-tls
+		DialContext:       (&net.Dialer{Timeout: Timeout, KeepAlive: 30 * time.Second}).DialContext,
+		TLSHandshakeTimeout: Timeout,
+		ResponseHeaderTimeout: Timeout,
+	}
 	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: opts.TLSInsecure}, // #nosec G402 - opt-in via --insecure-tls
-		},
+		Transport: transport,
+		Timeout:   Timeout * 2,
 	}
 
 	// Step 1 - POST /certsrv/certfnsh.asp with the CSR.
@@ -140,12 +172,18 @@ func postCertSrv(opts Options, csrDER []byte) (*x509.Certificate, error) {
 		postReq.SetBasicAuth(opts.Username, opts.Password)
 	}
 
+	progf("[*]", "POST %s", postURL)
 	resp, err := client.Do(postReq)
 	if err != nil {
 		return nil, fmt.Errorf("req: certfnsh POST: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
+	progf("[+]", "HTTP %d (%d bytes)", resp.StatusCode, len(body))
+	if Debug {
+		progf("[debug]", "response headers: %v", resp.Header)
+		progf("[debug]", "response body: %s", truncate(string(body), 400))
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("req: certfnsh status %d: %s", resp.StatusCode, truncate(string(body), 200))

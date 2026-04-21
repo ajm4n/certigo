@@ -73,9 +73,18 @@ func submitRPC(opts Options) (*pki.Certificate, error) {
 	}
 	defer func() { _ = conn.Close(ctx) }()
 
+	progf("[*]", "dcerpc dialed %s; binding ICertPassage", opts.CA)
 	cli, err := icertpassage.NewCertPassageClient(ctx, conn)
 	if err != nil {
-		return nil, fmt.Errorf("req: ICPR bind: %w", err)
+		// Certipy's default path is MS-WCCE ICertRequest over DCOM, which
+		// go-msrpc can only reach via IRemoteSCMActivator activation. Many
+		// AD CS installs expose ICertPassage on SMB named-pipe only; some
+		// only over DCOM. Give the operator an actionable hint.
+		return nil, fmt.Errorf(
+			"req: ICPR bind: %w\n  hint: target may not expose ICertPassage over TCP/EPM; "+
+				"try --method web with --insecure-tls, or fall back to certipy req "+
+				"(which defaults to DCOM ICertRequest)", err,
+		)
 	}
 
 	attribString := fmt.Sprintf("CertificateTemplate:%s", opts.Template)
@@ -96,10 +105,12 @@ func submitRPC(opts Options) (*pki.Certificate, error) {
 		},
 	}
 
+	progf("[*]", "submitting CertServerRequest to %q (template %q)", opts.CAName, opts.Template)
 	resp, err := cli.CertServerRequest(ctx, rpcReq)
 	if err != nil {
 		return nil, fmt.Errorf("req: CertServerRequest: %w", err)
 	}
+	progf("[+]", "CA disposition %d", resp.Disposition)
 	if resp.Disposition != 3 /* CR_DISP_ISSUED */ {
 		return nil, fmt.Errorf("req: CA returned disposition %d (want 3=issued)", resp.Disposition)
 	}
