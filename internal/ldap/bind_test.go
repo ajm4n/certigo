@@ -38,12 +38,28 @@ type stubs struct {
 	simple, ntlm, ntlmHash, gss int
 }
 
-func TestBind_SelectsPassword(t *testing.T) {
+func TestBind_SelectsNTLMForPassword(t *testing.T) {
 	s := withStubs(t)
 	creds := &auth.Credentials{
 		Username: "alice",
 		Domain:   "CTG.LOCAL",
 		Password: "hunter2",
+	}
+	if err := Bind(nil, creds, ""); err != nil {
+		t.Fatalf("Bind: %v", err)
+	}
+	if s.ntlm != 1 || s.simple+s.ntlmHash+s.gss != 0 {
+		t.Fatalf("expected NTLM bind only, got %+v", s)
+	}
+}
+
+func TestBind_SelectsSimpleWhenOptedIn(t *testing.T) {
+	s := withStubs(t)
+	creds := &auth.Credentials{
+		Username:      "alice",
+		Domain:        "CTG.LOCAL",
+		Password:      "hunter2",
+		UseSimpleBind: true,
 	}
 	if err := Bind(nil, creds, ""); err != nil {
 		t.Fatalf("Bind: %v", err)

@@ -14,17 +14,18 @@ import (
 )
 
 type findFlags struct {
-	username string
-	password string
-	domain   string
-	hashes   string
-	dcHost   string
-	port     int
-	useTLS   bool
-	insecure bool
-	useKrb   bool
-	format   string
-	out      string
+	username   string
+	password   string
+	domain     string
+	hashes     string
+	dcHost     string
+	port       int
+	useTLS     bool
+	insecure   bool
+	useKrb     bool
+	simpleBind bool
+	format     string
+	out        string
 }
 
 func newFindCmd() *cobra.Command {
@@ -45,6 +46,7 @@ func newFindCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&f.useTLS, "ldaps", false, "use LDAPS (auto-enabled for port 636)")
 	cmd.Flags().BoolVar(&f.insecure, "ldap-insecure", false, "skip TLS certificate verification")
 	cmd.Flags().BoolVarP(&f.useKrb, "kerberos", "k", false, "use Kerberos GSSAPI bind")
+	cmd.Flags().BoolVar(&f.simpleBind, "simple-bind", false, "use LDAP simple bind instead of NTLM (default: NTLM)")
 	cmd.Flags().StringVar(&f.format, "format", "text", "output format: text|json|zip|bloodhound")
 	cmd.Flags().StringVarP(&f.out, "output", "o", "", "write output to file instead of stdout")
 	return cmd
@@ -52,11 +54,12 @@ func newFindCmd() *cobra.Command {
 
 func runFind(f *findFlags) error {
 	creds := &auth.Credentials{
-		Username:    f.username,
-		Domain:      f.domain,
-		Password:    f.password,
-		UseKerberos: f.useKrb,
-		KDCHost:     f.dcHost,
+		Username:      f.username,
+		Domain:        f.domain,
+		Password:      f.password,
+		UseKerberos:   f.useKrb,
+		UseSimpleBind: f.simpleBind,
+		KDCHost:       f.dcHost,
 	}
 	if f.hashes != "" {
 		lm, nt, err := auth.ParseHashes(f.hashes)
@@ -70,29 +73,16 @@ func runFind(f *findFlags) error {
 		return fmt.Errorf("find: %w", err)
 	}
 
-	server := f.dcHost
-	if server == "" {
-		return fmt.Errorf("find: --dc-host required")
-	}
-	useTLS := f.useTLS || f.port == 636
-
-	conn, err := ldap.Dial(ldap.DialOptions{
-		Server:             fmt.Sprintf("%s:%d", server, f.port),
-		UseTLS:             useTLS,
+	conn, err := ldap.DialAndBind(creds, ldap.AutoOptions{
+		DCHost:             f.dcHost,
+		Port:               f.port,
+		UseTLS:             f.useTLS,
 		InsecureSkipVerify: f.insecure,
 	})
 	if err != nil {
-		return fmt.Errorf("find: ldap dial: %w", err)
+		return fmt.Errorf("find: %w", err)
 	}
 	defer func() { _ = conn.Close() }()
-
-	spn := ""
-	if creds.UseKerberos {
-		spn = fmt.Sprintf("ldap/%s", server)
-	}
-	if err := ldap.Bind(conn, creds, spn); err != nil {
-		return fmt.Errorf("find: ldap bind: %w", err)
-	}
 
 	_, configNC, err := adcs.RootDSE(conn)
 	if err != nil {

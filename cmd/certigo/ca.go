@@ -99,23 +99,16 @@ func runCA(f *caFlags) error {
 		return fmt.Errorf("ca: --dc-host required")
 	}
 
-	conn, err := ldap.Dial(ldap.DialOptions{
-		Server:             fmt.Sprintf("%s:%d", f.dcHost, f.port),
-		UseTLS:             f.useTLS || f.port == 636,
+	conn, err := ldap.DialAndBind(creds, ldap.AutoOptions{
+		DCHost:             f.dcHost,
+		Port:               f.port,
+		UseTLS:             f.useTLS,
 		InsecureSkipVerify: f.insecure,
 	})
 	if err != nil {
-		return fmt.Errorf("ca: dial: %w", err)
+		return err
 	}
 	defer func() { _ = conn.Close() }()
-
-	spn := ""
-	if creds.UseKerberos {
-		spn = "ldap/" + f.dcHost
-	}
-	if err := ldap.Bind(conn, creds, spn); err != nil {
-		return fmt.Errorf("ca: bind: %w", err)
-	}
 
 	_, configNC, err := adcs.RootDSE(conn)
 	if err != nil {

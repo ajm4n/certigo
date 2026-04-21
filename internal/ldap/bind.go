@@ -28,10 +28,15 @@ var (
 )
 
 // Bind authenticates the connection using the given Credentials.
-//   - If Credentials.UseKerberos       → SPNEGO/GSSAPI bind with a gokrb5 client
-//   - If Credentials.HasNTHash()       → NTLM bind via go-ldap's built-in helper
-//   - If Credentials.HasPassword()     → SimpleBind
-//   - If Credentials.HasCertificate()  → deferred (M3); return an error
+//   - Credentials.UseKerberos       GSSAPI/SPNEGO bind with a gokrb5 client
+//   - Credentials.HasNTHash()       NTLM bind (pass-the-hash) via go-ldap
+//   - Credentials.HasPassword()     NTLM bind with plaintext password. AD's
+//                                   simple bind rejects machine accounts and
+//                                   refuses plaintext auth whenever LDAP
+//                                   signing is enforced, so NTLM is the
+//                                   default. Set Credentials.UseSimpleBind =
+//                                   true to opt into the legacy behavior.
+//   - Credentials.HasCertificate()  deferred; returns ErrCertAuthDeferred
 //
 // The spn argument is required for Kerberos (e.g. "ldap/dc01.ctg.local").
 func Bind(conn *goldap.Conn, creds *auth.Credentials, spn string) error {
@@ -50,7 +55,10 @@ func Bind(conn *goldap.Conn, creds *auth.Credentials, spn string) error {
 		return ntlmHashBindFn(conn, creds)
 
 	case creds.HasPassword():
-		return simpleBindFn(conn, creds)
+		if creds.UseSimpleBind {
+			return simpleBindFn(conn, creds)
+		}
+		return ntlmBindFn(conn, creds)
 
 	case creds.HasCertificate():
 		return ErrCertAuthDeferred

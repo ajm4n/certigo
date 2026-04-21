@@ -29,10 +29,11 @@ type Credentials struct {
 	NTHash   []byte // 16 bytes
 
 	// Kerberos options.
-	UseKerberos bool
-	NoPass      bool   // -no-pass: pull creds from KRB5CCNAME instead
-	KDCHost     string // -dc-ip / explicit KDC; overrides krb5.conf lookup
-	DNSHost     string // -ns: nameserver override
+	UseKerberos   bool
+	UseSimpleBind bool   // opt into LDAP simple bind; default is NTLM bind
+	NoPass        bool   // -no-pass: pull creds from KRB5CCNAME instead
+	KDCHost       string // -dc-ip / explicit KDC; overrides krb5.conf lookup
+	DNSHost       string // -ns: nameserver override
 
 	// Certificate-based auth (PKINIT or Schannel path).
 	PFXPath     string

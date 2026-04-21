@@ -106,29 +106,16 @@ func runAccount(cmd *cobra.Command, f *accountFlags) error {
 		return fmt.Errorf("account: %w", err)
 	}
 
-	server := f.dcHost
-	if server == "" {
-		return fmt.Errorf("account: --dc-host required")
-	}
-	useTLS := f.useTLS || f.port == 636
-
-	conn, err := ldap.Dial(ldap.DialOptions{
-		Server:             fmt.Sprintf("%s:%d", server, f.port),
-		UseTLS:             useTLS,
+	conn, err := ldap.DialAndBind(creds, ldap.AutoOptions{
+		DCHost:             f.dcHost,
+		Port:               f.port,
+		UseTLS:             f.useTLS,
 		InsecureSkipVerify: f.insecure,
 	})
 	if err != nil {
-		return fmt.Errorf("account: ldap dial: %w", err)
+		return err
 	}
 	defer func() { _ = conn.Close() }()
-
-	spn := ""
-	if creds.UseKerberos {
-		spn = fmt.Sprintf("ldap/%s", server)
-	}
-	if err := ldap.Bind(conn, creds, spn); err != nil {
-		return fmt.Errorf("account: ldap bind: %w", err)
-	}
 
 	baseDN := f.baseDN
 	if baseDN == "" {
