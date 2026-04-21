@@ -11,12 +11,19 @@ import (
 	"github.com/ajm4n/certigo/internal/adcs"
 )
 
-// ANSI escape codes for bold column headers. Only emitted when the target
-// writer is a terminal; piping to a file or another process gets plain
-// text so downstream tooling isn't confused by escape sequences.
+// ANSI escape codes used for styling the short output. Only emitted when
+// the target writer is a terminal; piping to a file or another process
+// gets plain text so downstream tooling isn't confused by escape sequences.
 const (
-	ansiBold  = "\x1b[1m"
-	ansiReset = "\x1b[0m"
+	ansiReset    = "\x1b[0m"
+	ansiBold     = "\x1b[1m"
+	ansiDim      = "\x1b[2m"
+	ansiRed      = "\x1b[31m"
+	ansiGreen    = "\x1b[32m"
+	ansiYellow   = "\x1b[33m"
+	ansiBlue     = "\x1b[34m"
+	ansiCyan     = "\x1b[36m"
+	ansiBoldCyan = "\x1b[1;36m"
 )
 
 func isTerm(w io.Writer) bool {
@@ -31,12 +38,39 @@ func isTerm(w io.Writer) bool {
 	return (fi.Mode() & os.ModeCharDevice) != 0
 }
 
-// header returns s wrapped in ANSI bold codes when tty is true.
+// header returns s wrapped in bold-cyan when tty is true.
 func header(s string, tty bool) string {
 	if !tty {
 		return s
 	}
-	return ansiBold + s + ansiReset
+	return ansiBoldCyan + s + ansiReset
+}
+
+// boolCell renders a yes/no value with green/grey when on a tty.
+func boolCell(v bool, tty bool) string {
+	if !tty {
+		return yesNoShort(v)
+	}
+	if v {
+		return ansiGreen + "yes" + ansiReset
+	}
+	return ansiDim + "no" + ansiReset
+}
+
+// escCell renders the ESC list in red when there are findings, dim dash
+// otherwise. Non-tty output is plain.
+func escCell(findings []adcs.Finding, tty bool) string {
+	if len(findings) == 0 {
+		if tty {
+			return ansiDim + "-" + ansiReset
+		}
+		return "-"
+	}
+	s := escKinds(findings)
+	if !tty {
+		return s
+	}
+	return ansiRed + s + ansiReset
 }
 
 // ShortFormatter emits a compact one-line-per-template summary table plus
@@ -93,16 +127,12 @@ func (ShortFormatter) Format(w io.Writer, cas []*adcs.CertificateAuthority, temp
 
 	for _, t := range rows {
 		name := templateLabel(t)
-		escCol := "-"
-		if kinds := escKinds(t.Findings); kinds != "" {
-			escCol = kinds
-		}
 		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			name,
-			yesNoShort(t.Enabled),
-			yesNoShort(len(t.Findings) > 0),
-			yesNoShort(t.EnrollableByCurrentUser),
-			escCol,
+			boolCell(t.Enabled, tty),
+			boolCell(len(t.Findings) > 0, tty),
+			boolCell(t.EnrollableByCurrentUser, tty),
+			escCell(t.Findings, tty),
 			compactPublishedBy(t.PublishedBy),
 		); err != nil {
 			return err

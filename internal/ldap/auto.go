@@ -15,7 +15,27 @@ type AutoOptions struct {
 	DCHost             string // host or IP, no port
 	Port               int    // default 389 (or 636 with UseTLS)
 	UseTLS             bool   // force LDAPS
+	Scheme             string // "ldap" or "ldaps"; overrides UseTLS when set
 	InsecureSkipVerify bool
+}
+
+// normalize reconciles Scheme/UseTLS/Port so downstream callers can treat
+// Scheme as authoritative. When Scheme is "ldaps" we force UseTLS=true and
+// default Port to 636; "ldap" forces UseTLS=false. Unknown scheme values
+// are left alone for explicit error-raising in DialAndBind.
+func (o *AutoOptions) normalize() {
+	switch strings.ToLower(strings.TrimSpace(o.Scheme)) {
+	case "ldaps":
+		o.UseTLS = true
+		if o.Port == 0 || o.Port == 389 {
+			o.Port = 636
+		}
+	case "ldap":
+		o.UseTLS = false
+		if o.Port == 0 {
+			o.Port = 389
+		}
+	}
 }
 
 // DialAndBind is the certipy-style "do the right thing" front door for
@@ -31,6 +51,11 @@ func DialAndBind(creds *auth.Credentials, opts AutoOptions) (*goldap.Conn, error
 	if opts.DCHost == "" {
 		return nil, fmt.Errorf("ldap: --dc-host required")
 	}
+	s := strings.ToLower(strings.TrimSpace(opts.Scheme))
+	if s != "" && s != "ldap" && s != "ldaps" {
+		return nil, fmt.Errorf("ldap: invalid --scheme %q (want ldap or ldaps)", opts.Scheme)
+	}
+	opts.normalize()
 
 	normalizeCreds(creds)
 

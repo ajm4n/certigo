@@ -32,6 +32,7 @@ type findFlags struct {
 	onlyEnrollable bool
 	short          bool
 	howto          bool
+	scheme         string
 }
 
 func newFindCmd() *cobra.Command {
@@ -60,6 +61,7 @@ func newFindCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&f.onlyEnrollable, "enrollable", false, "only return templates the current user can enroll in")
 	cmd.Flags().BoolVar(&f.short, "short", false, "compact one-line-per-template summary output (equivalent to --format short)")
 	cmd.Flags().BoolVar(&f.howto, "howto", false, "with --vulnerable, print a suggested exploit command under each ESC finding")
+	cmd.Flags().StringVar(&f.scheme, "scheme", "", "LDAP scheme: ldap or ldaps (defaults to ldap; 636 implies ldaps)")
 	return cmd
 }
 
@@ -88,6 +90,7 @@ func runFind(f *findFlags) error {
 		DCHost:             f.dcHost,
 		Port:               f.port,
 		UseTLS:             f.useTLS,
+		Scheme:             f.scheme,
 		InsecureSkipVerify: f.insecure,
 	})
 	if err != nil {
