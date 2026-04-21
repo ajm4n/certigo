@@ -29,6 +29,9 @@ type findFlags struct {
 
 	onlyEnabled    bool
 	onlyVulnerable bool
+	onlyEnrollable bool
+	short          bool
+	howto          bool
 }
 
 func newFindCmd() *cobra.Command {
@@ -54,6 +57,9 @@ func newFindCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&f.out, "output", "o", "", "write output to file instead of stdout")
 	cmd.Flags().BoolVar(&f.onlyEnabled, "enabled", false, "only return templates published on at least one CA")
 	cmd.Flags().BoolVar(&f.onlyVulnerable, "vulnerable", false, "only return templates with at least one ESC finding")
+	cmd.Flags().BoolVar(&f.onlyEnrollable, "enrollable", false, "only return templates the current user can enroll in")
+	cmd.Flags().BoolVar(&f.short, "short", false, "compact one-line-per-template summary output (equivalent to --format short)")
+	cmd.Flags().BoolVar(&f.howto, "howto", false, "with --vulnerable, print a suggested exploit command under each ESC finding")
 	return cmd
 }
 
@@ -89,7 +95,7 @@ func runFind(f *findFlags) error {
 	}
 	defer func() { _ = conn.Close() }()
 
-	_, configNC, err := adcs.RootDSE(conn)
+	domainNC, configNC, err := adcs.RootDSE(conn)
 	if err != nil {
 		return fmt.Errorf("find: rootDSE: %w", err)
 	}
@@ -105,11 +111,22 @@ func runFind(f *findFlags) error {
 	}
 
 	adcs.LinkPublishedTemplates(cas, templates)
+	adcs.ResolveSIDs(adcs.NewLDAPSIDResolver(conn, domainNC), cas, templates)
+
+	if idents, err := adcs.IdentitySet(conn, creds.Username, domainNC); err == nil {
+		adcs.MarkEnrollableTemplates(templates, idents)
+	}
+
 	esc.Scan(templates, cas)
 
-	templates = filterTemplates(templates, f.onlyEnabled, f.onlyVulnerable)
+	templates = filterTemplates(templates, f.onlyEnabled, f.onlyVulnerable, f.onlyEnrollable)
 
-	formatter, err := output.Get(f.format)
+	format := f.format
+	if f.short {
+		format = "short"
+	}
+	output.ShowHowto = f.howto && f.onlyVulnerable
+	formatter, err := output.Get(format)
 	if err != nil {
 		return fmt.Errorf("find: %w", err)
 	}
@@ -127,10 +144,10 @@ func runFind(f *findFlags) error {
 	return formatter.Format(w, cas, templates)
 }
 
-// filterTemplates narrows the output per --enabled / --vulnerable. Both
-// flags are AND-ed when both are set.
-func filterTemplates(in []*adcs.Template, onlyEnabled, onlyVulnerable bool) []*adcs.Template {
-	if !onlyEnabled && !onlyVulnerable {
+// filterTemplates narrows the output per --enabled / --vulnerable /
+// --enrollable. Flags are AND-ed when more than one is set.
+func filterTemplates(in []*adcs.Template, onlyEnabled, onlyVulnerable, onlyEnrollable bool) []*adcs.Template {
+	if !onlyEnabled && !onlyVulnerable && !onlyEnrollable {
 		return in
 	}
 	out := make([]*adcs.Template, 0, len(in))
@@ -142,6 +159,9 @@ func filterTemplates(in []*adcs.Template, onlyEnabled, onlyVulnerable bool) []*a
 			continue
 		}
 		if onlyVulnerable && len(t.Findings) == 0 {
+			continue
+		}
+		if onlyEnrollable && !t.EnrollableByCurrentUser {
 			continue
 		}
 		out = append(out, t)

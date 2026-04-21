@@ -46,7 +46,11 @@ type Template struct {
 	Name        string
 	DisplayName string
 	// Enabled is true when at least one enumerated CA publishes this template.
-	Enabled                 bool
+	Enabled bool
+	// EnrollableByCurrentUser is true when at least one EnrollmentRights
+	// ACE matches the bound principal's IdentitySet. Populated by
+	// MarkEnrollableTemplates; zero by default.
+	EnrollableByCurrentUser bool
 	SchemaVersion           int
 	ValidityPeriod          time.Duration
 	RenewalPeriod           time.Duration

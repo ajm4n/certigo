@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ajm4n/certigo/internal/adcs"
+	"github.com/ajm4n/certigo/internal/esc"
 )
 
 // TextFormatter renders a human-readable report closely modelled after
@@ -175,6 +176,17 @@ func writeTemplate(bw *bufWriter, t *adcs.Template) {
 				line = fmt.Sprintf("%s (%s)", line, f.Severity)
 			}
 			bw.line(line)
+
+			if ShowHowto {
+				var ca *adcs.CertificateAuthority
+				// Cheapest lookup: ACL-less caller pass; hints tolerate nil CA.
+				if hint := esc.ExploitHint(f, t, ca); hint != "" {
+					bw.line(indent(3) + "To exploit, run:")
+					for _, l := range strings.Split(hint, "\n") {
+						bw.line(indent(4) + l)
+					}
+				}
+			}
 		}
 	}
 }
