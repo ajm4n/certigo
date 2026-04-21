@@ -1,6 +1,10 @@
 package esc
 
-import "github.com/ajm4n/certigo/internal/adcs"
+import (
+	"strings"
+
+	"github.com/ajm4n/certigo/internal/adcs"
+)
 
 // Rule is a single ESC detection check. Input: one template + its
 // publishing CA (may be nil if the template is unpublished, or if the CA
@@ -110,15 +114,33 @@ func contains(haystack []string, needle string) bool {
 	return false
 }
 
-// templateEnrollableByLowPriv returns the low-priv ACEs that hold Enroll
-// (or AutoEnroll) rights on the template. Empty slice means only
-// privileged principals can enrol.
+// templateEnrollableByLowPriv returns the low-priv ACEs that actually hold
+// Enroll (or AutoEnroll) rights on the template. Empty slice means only
+// privileged principals can enrol. Read-only ACEs (ReadControl /
+// ReadProperty) are ignored - they do not grant enrollment.
 func templateEnrollableByLowPriv(tpl *adcs.Template) []adcs.Ace {
 	if tpl == nil {
 		return nil
 	}
 	combined := make([]adcs.Ace, 0, len(tpl.EnrollmentRights)+len(tpl.AutoEnrollRights))
-	combined = append(combined, tpl.EnrollmentRights...)
-	combined = append(combined, tpl.AutoEnrollRights...)
+	combined = append(combined, enrollAces(tpl.EnrollmentRights)...)
+	combined = append(combined, enrollAces(tpl.AutoEnrollRights)...)
 	return lowPrivAces(combined)
+}
+
+// enrollAces filters an ACE list to only those that grant enrollment
+// (the ControlAccess mask bit, which covers both the generic Extended-
+// Right and the Enrollment / AutoEnrollment specific rights that the CA
+// treats as "may request a certificate"). The SD parser surfaces every
+// ACE with a rights summary string; we filter by substring because the
+// summary is fully rendered ("ControlAccess|WriteProperty|ReadProperty"
+// etc).
+func enrollAces(aces []adcs.Ace) []adcs.Ace {
+	out := make([]adcs.Ace, 0, len(aces))
+	for _, a := range aces {
+		if strings.Contains(a.Rights, "ControlAccess") {
+			out = append(out, a)
+		}
+	}
+	return out
 }

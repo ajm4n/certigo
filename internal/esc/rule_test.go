@@ -20,7 +20,7 @@ func baseEnrollable() *adcs.Template {
 		Name:        "Test",
 		DisplayName: "Test Template",
 		EnrollmentRights: []adcs.Ace{
-			{SID: lowPrivSID, Name: "CORP\\alice"},
+			{SID: lowPrivSID, Name: "CORP\\alice", Rights: "ControlAccess"},
 		},
 	}
 }
