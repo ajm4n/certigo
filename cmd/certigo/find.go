@@ -132,7 +132,22 @@ func runFind(f *findFlags) error {
 	adcs.LinkPublishedTemplates(cas, templates)
 
 	p.Infof("Resolving ACE principal SIDs")
-	adcs.ResolveSIDs(adcs.NewLDAPSIDResolver(conn, domainNC), cas, templates)
+	// Cross-domain / foreign-security-principal SIDs only resolve through
+	// the Global Catalog. Best-effort dial on port 3268 - if the bound
+	// DC isn't also a GC, or 3268 is firewalled, silently continue with
+	// domain-only resolution.
+	var gcConn *goldapConn
+	if gc, gerr := ldap.DialAndBind(creds, ldap.AutoOptions{
+		DCHost:             f.dcHost,
+		Port:               3268,
+		Scheme:             "ldap",
+		InsecureSkipVerify: f.insecure,
+	}); gerr == nil {
+		gcConn = gc
+		defer func() { _ = gc.Close() }()
+		p.Infof("Global Catalog bound on :3268 for cross-domain SID resolution")
+	}
+	adcs.ResolveSIDs(adcs.NewLDAPSIDResolver(conn, domainNC, gcConn), cas, templates)
 
 	p.Infof("Resolving current user group memberships")
 	if idents, err := adcs.IdentitySet(conn, creds.Username, domainNC); err == nil {

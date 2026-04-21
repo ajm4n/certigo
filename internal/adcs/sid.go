@@ -66,8 +66,13 @@ var WellKnownSIDs = map[string]string{
 // SIDs against the given bound LDAP connection. Well-known SIDs are looked
 // up in WellKnownSIDs without hitting the wire. Resolution failures return
 // the SID itself so the caller can still render something.
-func NewLDAPSIDResolver(conn *goldap.Conn, domainNC string) SIDResolver {
+//
+// Pass one or more conns: the first should be the primary domain LDAP,
+// additional conns are tried on miss (typically a Global Catalog on port
+// 3268 so cross-domain / foreign-security-principal SIDs resolve too).
+func NewLDAPSIDResolver(conn *goldap.Conn, domainNC string, extras ...*goldap.Conn) SIDResolver {
 	cache := make(map[string]string)
+	conns := append([]*goldap.Conn{conn}, extras...)
 	return func(sid string) (string, error) {
 		if sid == "" {
 			return "", nil
@@ -79,36 +84,44 @@ func NewLDAPSIDResolver(conn *goldap.Conn, domainNC string) SIDResolver {
 			cache[sid] = name
 			return name, nil
 		}
-		if conn == nil || domainNC == "" {
-			return sid, nil
+		for _, c := range conns {
+			if c == nil {
+				continue
+			}
+			if name := lookupSIDOnConn(c, sid); name != "" {
+				cache[sid] = name
+				return name, nil
+			}
 		}
-		// AD supports binding a search against <SID=...> as the base DN
-		// to resolve by objectSid without a filter-escaped binary blob.
-		req := goldap.NewSearchRequest(
-			"<SID="+sid+">",
-			goldap.ScopeBaseObject,
-			goldap.NeverDerefAliases,
-			0, 0, false,
-			"(objectClass=*)",
-			[]string{"sAMAccountName", "name", "objectClass"},
-			nil,
-		)
-		res, err := conn.Search(req)
-		if err != nil || len(res.Entries) == 0 {
-			cache[sid] = sid
-			return sid, nil
-		}
-		entry := res.Entries[0]
-		name := entry.GetAttributeValue("sAMAccountName")
-		if name == "" {
-			name = entry.GetAttributeValue("name")
-		}
-		if name == "" {
-			name = sid
-		}
-		cache[sid] = name
-		return name, nil
+		cache[sid] = sid
+		return sid, nil
 	}
+}
+
+// lookupSIDOnConn issues a base-scope search with the "<SID=...>" bind DN
+// form AD supports. Returns the resolved name or "" on miss / error.
+func lookupSIDOnConn(conn *goldap.Conn, sid string) string {
+	req := goldap.NewSearchRequest(
+		"<SID="+sid+">",
+		goldap.ScopeBaseObject,
+		goldap.NeverDerefAliases,
+		0, 0, false,
+		"(objectClass=*)",
+		[]string{"sAMAccountName", "name", "objectClass"},
+		nil,
+	)
+	res, err := conn.Search(req)
+	if err != nil || len(res.Entries) == 0 {
+		return ""
+	}
+	entry := res.Entries[0]
+	if v := entry.GetAttributeValue("sAMAccountName"); v != "" {
+		return v
+	}
+	if v := entry.GetAttributeValue("name"); v != "" {
+		return v
+	}
+	return ""
 }
 
 // ResolveSIDs walks every ACE on every CA and Template and populates the
