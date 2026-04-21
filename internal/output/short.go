@@ -4,12 +4,37 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/ajm4n/certigo/internal/adcs"
 )
+
+// ansiRE matches any CSI escape sequence (\x1b[...m, etc.). Used by
+// ansiWidth to compute a cell's *visible* character count so padding
+// lines up when columns contain colored values. text/tabwriter does not
+// do this - it counts raw bytes, which inflates column widths whenever
+// colors are present and misaligns the output.
+var ansiRE = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+// ansiWidth returns the display width of s (raw-byte length minus any
+// CSI escape sequences). Assumes single-byte runes, which is fine for
+// the ASCII text this formatter emits.
+func ansiWidth(s string) int {
+	return len(ansiRE.ReplaceAllString(s, ""))
+}
+
+// padRight returns s followed by enough spaces so the visible width
+// matches width. Panics on negative padding would be a bug; the caller
+// controls width.
+func padRight(s string, width int) string {
+	gap := width - ansiWidth(s)
+	if gap <= 0 {
+		return s
+	}
+	return s + strings.Repeat(" ", gap)
+}
 
 // ANSI escape codes used for styling the short output. Only emitted when
 // the target writer is a terminal; piping to a file or another process
@@ -90,31 +115,24 @@ func init() { register(ShortFormatter{}) }
 // and a leading CA block with name, DNS, template count.
 func (ShortFormatter) Format(w io.Writer, cas []*adcs.CertificateAuthority, templates []*adcs.Template) error {
 	tty := isTerm(w)
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 
-	if _, err := fmt.Fprintln(tw, header("CA\tDNS\tTEMPLATES", tty)); err != nil {
-		return err
-	}
+	// CA summary table.
+	caHeaders := []string{"CA", "DNS", "TEMPLATES"}
+	caRows := make([][]string, 0, len(cas))
 	for _, ca := range cas {
 		if ca == nil {
 			continue
 		}
-		if _, err := fmt.Fprintf(tw, "%s\t%s\t%d\n", ca.Name, ca.DNSName, len(ca.Templates)); err != nil {
-			return err
-		}
+		caRows = append(caRows, []string{ca.Name, ca.DNSName, fmt.Sprintf("%d", len(ca.Templates))})
 	}
-	if _, err := fmt.Fprintln(tw, ""); err != nil {
+	if err := printTable(w, caHeaders, caRows, tty); err != nil {
 		return err
 	}
-	if err := tw.Flush(); err != nil {
-		return err
-	}
-
-	tw = tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintln(tw, header("TEMPLATE\tENABLED\tVULN\tENROLL\tESCs\tPUBLISHED-ON", tty)); err != nil {
+	if _, err := fmt.Fprintln(w); err != nil {
 		return err
 	}
 
+	// Template summary table.
 	rows := make([]*adcs.Template, 0, len(templates))
 	for _, t := range templates {
 		if t != nil {
@@ -125,20 +143,62 @@ func (ShortFormatter) Format(w io.Writer, cas []*adcs.CertificateAuthority, temp
 		return templateLabel(rows[i]) < templateLabel(rows[j])
 	})
 
+	tHeaders := []string{"TEMPLATE", "ENABLED", "VULN", "ENROLL", "ESCs", "PUBLISHED-ON"}
+	tRows := make([][]string, 0, len(rows))
 	for _, t := range rows {
-		name := templateLabel(t)
-		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
-			name,
+		tRows = append(tRows, []string{
+			templateLabel(t),
 			boolCell(t.Enabled, tty),
 			boolCell(len(t.Findings) > 0, tty),
 			boolCell(t.EnrollableByCurrentUser, tty),
 			escCell(t.Findings, tty),
 			compactPublishedBy(t.PublishedBy),
-		); err != nil {
+		})
+	}
+	return printTable(w, tHeaders, tRows, tty)
+}
+
+// printTable emits a two-space-separated table with bold-cyan headers
+// (when tty), computing column widths from the *visible* character count
+// so ANSI-colored cells don't break alignment.
+func printTable(w io.Writer, headers []string, rows [][]string, tty bool) error {
+	widths := make([]int, len(headers))
+	for i, h := range headers {
+		widths[i] = ansiWidth(h)
+	}
+	for _, r := range rows {
+		for i, cell := range r {
+			if i >= len(widths) {
+				break
+			}
+			if ww := ansiWidth(cell); ww > widths[i] {
+				widths[i] = ww
+			}
+		}
+	}
+
+	writeRow := func(cells []string, asHeader bool) error {
+		parts := make([]string, len(cells))
+		for i, c := range cells {
+			padded := padRight(c, widths[i])
+			if asHeader {
+				padded = header(padded, tty)
+			}
+			parts[i] = padded
+		}
+		_, err := fmt.Fprintln(w, strings.Join(parts, "  "))
+		return err
+	}
+
+	if err := writeRow(headers, true); err != nil {
+		return err
+	}
+	for _, r := range rows {
+		if err := writeRow(r, false); err != nil {
 			return err
 		}
 	}
-	return tw.Flush()
+	return nil
 }
 
 // compactPublishedBy keeps the PUBLISHED-ON column from ballooning when a
