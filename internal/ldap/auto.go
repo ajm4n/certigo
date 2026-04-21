@@ -5,9 +5,16 @@ import (
 	"strings"
 
 	goldap "github.com/go-ldap/ldap/v3"
+	goldapgss "github.com/go-ldap/ldap/v3/gssapi"
+	gokrbclient "github.com/jcmturner/gokrb5/v8/client"
 
 	"github.com/ajm4n/certigo/internal/auth"
 )
+
+// ldapGSSAPI aliases the external go-ldap gssapi.Client wrapper we use
+// against a gokrb5 *client.Client. Keeping the alias here lets callers
+// avoid pulling the gssapi package directly.
+type ldapGSSAPI = goldapgss.Client
 
 // AutoOptions bundles the inputs DialAndBind needs. Most subcommands populate
 // these directly from their CLI flags; the helper does the rest.
@@ -98,6 +105,41 @@ func DialAndBind(creds *auth.Credentials, opts AutoOptions) (*goldap.Conn, error
 			return conn2, nil
 		}
 		return nil, err
+	}
+	return conn, nil
+}
+
+// DialWithKerberos opens an LDAP/LDAPS connection to opts.DCHost and binds
+// via GSSAPI/SPNEGO using the supplied already-authenticated gokrb5
+// client. Unlike DialAndBind, this path does not attempt NTLM or simple
+// bind - it assumes the caller has already obtained a TGT (e.g. via
+// PKINIT + ccache) and wants to use it directly.
+func DialWithKerberos(creds *auth.Credentials, krbClient *gokrbclient.Client, opts AutoOptions) (*goldap.Conn, error) {
+	if opts.DCHost == "" {
+		return nil, fmt.Errorf("ldap: DialWithKerberos: DCHost required")
+	}
+	opts.normalize()
+
+	port := opts.Port
+	if port == 0 {
+		port = 389
+		if opts.UseTLS {
+			port = 636
+		}
+	}
+	conn, err := dialWith(opts, port, opts.UseTLS)
+	if err != nil {
+		return nil, err
+	}
+	spn := "ldap/" + opts.DCHost
+	if err := krbClient.Login(); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("ldap: kerberos login: %w", err)
+	}
+	gssCl := &ldapGSSAPI{Client: krbClient}
+	if err := conn.GSSAPIBind(gssCl, spn, ""); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("ldap: GSSAPI bind: %w", err)
 	}
 	return conn, nil
 }

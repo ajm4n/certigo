@@ -33,6 +33,7 @@ type findFlags struct {
 	short          bool
 	howto          bool
 	scheme         string
+	ldapShell      bool
 }
 
 func newFindCmd() *cobra.Command {
@@ -62,6 +63,7 @@ func newFindCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&f.short, "short", false, "compact one-line-per-template summary output (equivalent to --format short)")
 	cmd.Flags().BoolVar(&f.howto, "howto", false, "with --vulnerable, print a suggested exploit command under each ESC finding")
 	cmd.Flags().StringVar(&f.scheme, "scheme", "", "LDAP scheme: ldap or ldaps (defaults to ldap; 636 implies ldaps)")
+	cmd.Flags().BoolVar(&f.ldapShell, "ldap-shell", false, "after enumeration, drop into an interactive LDAP REPL bound as the current principal")
 	return cmd
 }
 
@@ -86,6 +88,9 @@ func runFind(f *findFlags) error {
 		return fmt.Errorf("find: %w", err)
 	}
 
+	p := newProgress(os.Stderr)
+
+	p.Infof("Connecting to %s", f.dcHost)
 	conn, err := ldap.DialAndBind(creds, ldap.AutoOptions{
 		DCHost:             f.dcHost,
 		Port:               f.port,
@@ -97,32 +102,59 @@ func runFind(f *findFlags) error {
 		return fmt.Errorf("find: %w", err)
 	}
 	defer func() { _ = conn.Close() }()
+	p.OKf("Bound to %s as %s", f.dcHost, creds.Username)
 
+	p.Infof("Discovering naming contexts via RootDSE")
 	domainNC, configNC, err := adcs.RootDSE(conn)
 	if err != nil {
 		return fmt.Errorf("find: rootDSE: %w", err)
 	}
+	p.OKf("Configuration NC: %s", configNC)
 
+	p.Infof("Enumerating certificate authorities")
 	cas, err := adcs.EnumCAs(conn, configNC)
 	if err != nil {
 		return fmt.Errorf("find: enum CAs: %w", err)
 	}
+	p.OKf("Found %d certificate %s", len(cas), plural(len(cas), "authority", "authorities"))
 
+	p.Infof("Enumerating certificate templates")
 	templates, err := adcs.EnumTemplates(conn, configNC)
 	if err != nil {
 		return fmt.Errorf("find: enum templates: %w", err)
 	}
+	p.OKf("Found %d certificate %s", len(templates), plural(len(templates), "template", "templates"))
 
+	p.Infof("Linking templates to publishing CAs")
 	adcs.LinkPublishedTemplates(cas, templates)
+
+	p.Infof("Resolving ACE principal SIDs")
 	adcs.ResolveSIDs(adcs.NewLDAPSIDResolver(conn, domainNC), cas, templates)
 
+	p.Infof("Resolving current user group memberships")
 	if idents, err := adcs.IdentitySet(conn, creds.Username, domainNC); err == nil {
 		adcs.MarkEnrollableTemplates(templates, idents)
+		p.OKf("Current principal in %d groups", len(idents))
+	} else {
+		p.Warnf("Could not resolve identity set: %v", err)
 	}
 
-	esc.Scan(templates, cas)
+	p.Infof("Running ESC1-16 detection rules")
+	total := esc.Scan(templates, cas)
+	vulnCount := 0
+	for _, t := range templates {
+		if t != nil && len(t.Findings) > 0 {
+			vulnCount++
+		}
+	}
+	p.OKf("Found %d potential %s across %d %s", total, plural(total, "finding", "findings"),
+		vulnCount, plural(vulnCount, "template", "templates"))
 
+	before := len(templates)
 	templates = filterTemplates(templates, f.onlyEnabled, f.onlyVulnerable, f.onlyEnrollable)
+	if before != len(templates) {
+		p.Infof("Applied filters: %d of %d templates remain", len(templates), before)
+	}
 
 	format := f.format
 	if f.short {
@@ -144,7 +176,24 @@ func runFind(f *findFlags) error {
 		w = file
 	}
 
-	return formatter.Format(w, cas, templates)
+	if err := formatter.Format(w, cas, templates); err != nil {
+		return err
+	}
+
+	if f.ldapShell {
+		baseDN := domainToBaseDN(f.domain)
+		if baseDN == "" {
+			// Discover from RootDSE if --domain wasn't supplied.
+			baseDN = domainNC
+		}
+		shell := &ldap.Shell{
+			Conn:     conn,
+			BaseDN:   baseDN,
+			Username: creds.Username,
+		}
+		return shell.Run()
+	}
+	return nil
 }
 
 // filterTemplates narrows the output per --enabled / --vulnerable /
