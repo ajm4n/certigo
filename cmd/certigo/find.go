@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -34,6 +35,7 @@ type findFlags struct {
 	howto          bool
 	scheme         string
 	ldapShell      bool
+	escOnly        []string
 }
 
 func newFindCmd() *cobra.Command {
@@ -64,6 +66,7 @@ func newFindCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&f.howto, "howto", false, "with --vulnerable, print a suggested exploit command under each ESC finding")
 	cmd.Flags().StringVar(&f.scheme, "scheme", "", "LDAP scheme: ldap or ldaps (defaults to ldap; 636 implies ldaps)")
 	cmd.Flags().BoolVar(&f.ldapShell, "ldap-shell", false, "after enumeration, drop into an interactive LDAP REPL bound as the current principal")
+	cmd.Flags().StringSliceVar(&f.escOnly, "esc", nil, "only keep templates with findings of these ESCs (comma-separated or repeatable; e.g. --esc ESC1 or --esc ESC1,ESC4). Implies --vulnerable and filters the Findings list down to the matching ESCs.")
 	return cmd
 }
 
@@ -150,6 +153,10 @@ func runFind(f *findFlags) error {
 	p.OKf("Found %d potential %s across %d %s", total, plural(total, "finding", "findings"),
 		vulnCount, plural(vulnCount, "template", "templates"))
 
+	if len(f.escOnly) > 0 {
+		templates = filterByESC(templates, f.escOnly)
+		f.onlyVulnerable = true
+	}
 	before := len(templates)
 	templates = filterTemplates(templates, f.onlyEnabled, f.onlyVulnerable, f.onlyEnrollable)
 	if before != len(templates) {
@@ -194,6 +201,43 @@ func runFind(f *findFlags) error {
 		return shell.Run()
 	}
 	return nil
+}
+
+// filterByESC keeps only templates that have at least one finding whose
+// ESC matches one of the requested kinds, and also trims each surviving
+// template's Findings list to just those ESCs. This gives the operator
+// a focused view: `--esc ESC1` shows ESC1-vulnerable templates and only
+// the ESC1 line under each template's [!] Vulnerabilities block.
+func filterByESC(in []*adcs.Template, kinds []string) []*adcs.Template {
+	wanted := make(map[string]bool, len(kinds))
+	for _, k := range kinds {
+		wanted[normalizeESC(k)] = true
+	}
+	out := make([]*adcs.Template, 0, len(in))
+	for _, t := range in {
+		if t == nil {
+			continue
+		}
+		matched := make([]adcs.Finding, 0, len(t.Findings))
+		for _, f := range t.Findings {
+			if wanted[normalizeESC(f.ESC)] {
+				matched = append(matched, f)
+			}
+		}
+		if len(matched) == 0 {
+			continue
+		}
+		t.Findings = matched
+		out = append(out, t)
+	}
+	return out
+}
+
+// normalizeESC uppercases and trims user input so --esc esc1 / --esc ESC1
+// / --esc esc01 all match.
+func normalizeESC(s string) string {
+	s = strings.TrimSpace(strings.ToUpper(s))
+	return s
 }
 
 // filterTemplates narrows the output per --enabled / --vulnerable /
