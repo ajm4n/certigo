@@ -1,11 +1,33 @@
 package adcs
 
 import (
+	"encoding/asn1"
 	"errors"
 	"fmt"
 
 	goldap "github.com/go-ldap/ldap/v3"
 )
+
+// LDAPServerSDFlagsOID is the LDAP control that tells the server which
+// portions of nTSecurityDescriptor to return. Without it, a non-privileged
+// bind gets an empty SD and every ACL-based ESC check silently finds
+// nothing. Value 7 = OWNER | GROUP | DACL.
+const LDAPServerSDFlagsOID = "1.2.840.113556.1.4.801"
+
+// sdFlagsControl builds the LDAP control that asks the DC for owner + group
+// + DACL in nTSecurityDescriptor. Marshaling a single INTEGER inside a
+// SEQUENCE is what the server expects per MS-ADTS 3.1.1.3.4.1.11.
+func sdFlagsControl() goldap.Control {
+	type sdFlags struct {
+		Flags int
+	}
+	raw, _ := asn1.Marshal(sdFlags{Flags: 7})
+	return &goldap.ControlString{
+		ControlType:  LDAPServerSDFlagsOID,
+		Criticality:  true,
+		ControlValue: string(raw),
+	}
+}
 
 // ErrConfigNCUnknown is returned when a caller asks for enumeration
 // against a configuration NC that could not be determined.
@@ -84,7 +106,7 @@ func EnumCAs(conn *goldap.Conn, searchBase string) ([]*CertificateAuthority, err
 		false,
 		FilterEnrollmentService,
 		CAAttrs,
-		nil,
+		[]goldap.Control{sdFlagsControl()},
 	)
 	res, err := conn.Search(req)
 	if err != nil {
@@ -133,7 +155,7 @@ func EnumTemplates(conn *goldap.Conn, configNC string) ([]*Template, error) {
 		false,
 		FilterCertificateTemplate,
 		TemplateAttrs,
-		nil,
+		[]goldap.Control{sdFlagsControl()},
 	)
 	res, err := conn.Search(req)
 	if err != nil {

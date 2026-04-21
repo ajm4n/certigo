@@ -99,6 +99,7 @@ func runFind(f *findFlags) error {
 		return fmt.Errorf("find: enum templates: %w", err)
 	}
 
+	adcs.LinkPublishedTemplates(cas, templates)
 	esc.Scan(templates, cas)
 
 	formatter, err := output.Get(f.format)

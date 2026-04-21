@@ -43,8 +43,10 @@ type CertificateAuthority struct {
 // Template is an AD CS certificate template as stored under
 // CN=Templates,CN=Public Key Services,CN=Services,CN=Configuration.
 type Template struct {
-	Name                    string
-	DisplayName             string
+	Name        string
+	DisplayName string
+	// Enabled is true when at least one enumerated CA publishes this template.
+	Enabled                 bool
 	SchemaVersion           int
 	ValidityPeriod          time.Duration
 	RenewalPeriod           time.Duration

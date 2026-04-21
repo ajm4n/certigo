@@ -108,6 +108,7 @@ func writeTemplate(bw *bufWriter, t *adcs.Template) {
 	if t.Name != "" && t.Name != name {
 		bw.kv(1, "Template CN", t.Name)
 	}
+	bw.kv(1, "Enabled", yesNo(t.Enabled))
 	bw.kv(1, "Schema Version", fmt.Sprintf("%d", t.SchemaVersion))
 	if t.ValidityPeriod > 0 {
 		bw.kv(1, "Validity Period", t.ValidityPeriod.String())
@@ -130,19 +131,19 @@ func writeTemplate(bw *bufWriter, t *adcs.Template) {
 	if len(t.EKUs) > 0 {
 		bw.kv(1, "Extended Key Usage", "")
 		for _, e := range t.EKUs {
-			bw.line(indent(2) + e)
+			bw.line(indent(2) + formatOID(e))
 		}
 	}
 	if len(t.ApplicationPolicies) > 0 {
 		bw.kv(1, "Application Policies", "")
 		for _, e := range t.ApplicationPolicies {
-			bw.line(indent(2) + e)
+			bw.line(indent(2) + formatOID(e))
 		}
 	}
 	if len(t.MsPKICertificatePolicies) > 0 {
 		bw.kv(1, "Certificate Policies", "")
 		for _, e := range t.MsPKICertificatePolicies {
-			bw.line(indent(2) + e)
+			bw.line(indent(2) + formatOID(e))
 		}
 	}
 	if len(t.PublishedBy) > 0 {
@@ -211,6 +212,18 @@ func yesNo(b bool) string {
 }
 
 func indent(depth int) string { return strings.Repeat("  ", depth) }
+
+// formatOID returns "<Friendly Name> (<oid>)" when the OID is in the known
+// AD CS/X.509 map, or the bare OID otherwise. Used to print EKUs and
+// application / certificate policies in a way that's readable without
+// cross-referencing Microsoft's OID registry.
+func formatOID(oid string) string {
+	name := adcs.OIDName(oid)
+	if name == oid {
+		return oid
+	}
+	return name + " (" + oid + ")"
+}
 
 // bufWriter is a tiny io.Writer wrapper that remembers the first error so we
 // can keep the write helpers expression-free.
