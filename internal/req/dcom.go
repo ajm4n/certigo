@@ -73,7 +73,6 @@ func submitDCOM(opts Options) (*pki.Certificate, error) {
 	defer cancel()
 	ctx = gssapi.NewSecurityContext(ctx,
 		gssapi.WithCredential(cred),
-		gssapi.WithMechanismFactory(ssp.SPNEGO),
 		gssapi.WithMechanismFactory(ssp.NTLM),
 	)
 
