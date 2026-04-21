@@ -3,12 +3,41 @@ package output
 import (
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/ajm4n/certigo/internal/adcs"
 )
+
+// ANSI escape codes for bold column headers. Only emitted when the target
+// writer is a terminal; piping to a file or another process gets plain
+// text so downstream tooling isn't confused by escape sequences.
+const (
+	ansiBold  = "\x1b[1m"
+	ansiReset = "\x1b[0m"
+)
+
+func isTerm(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	fi, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return (fi.Mode() & os.ModeCharDevice) != 0
+}
+
+// header returns s wrapped in ANSI bold codes when tty is true.
+func header(s string, tty bool) string {
+	if !tty {
+		return s
+	}
+	return ansiBold + s + ansiReset
+}
 
 // ShortFormatter emits a compact one-line-per-template summary table plus
 // a short CA section. Useful for scripting and for triage scans where the
@@ -26,9 +55,10 @@ func init() { register(ShortFormatter{}) }
 //
 // and a leading CA block with name, DNS, template count.
 func (ShortFormatter) Format(w io.Writer, cas []*adcs.CertificateAuthority, templates []*adcs.Template) error {
+	tty := isTerm(w)
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 
-	if _, err := fmt.Fprintln(tw, "CA\tDNS\tTEMPLATES"); err != nil {
+	if _, err := fmt.Fprintln(tw, header("CA\tDNS\tTEMPLATES", tty)); err != nil {
 		return err
 	}
 	for _, ca := range cas {
@@ -47,7 +77,7 @@ func (ShortFormatter) Format(w io.Writer, cas []*adcs.CertificateAuthority, temp
 	}
 
 	tw = tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintln(tw, "TEMPLATE\tPUBLISHED-ON\tENABLED\tVULN\tENROLL\tESCs"); err != nil {
+	if _, err := fmt.Fprintln(tw, header("TEMPLATE\tPUBLISHED-ON\tENABLED\tVULN\tENROLL\tESCs", tty)); err != nil {
 		return err
 	}
 
