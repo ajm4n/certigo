@@ -88,6 +88,15 @@ func TestESC1(t *testing.T) {
 	if got := (ESC1{}).Check(tpl, nil); len(got) != 0 {
 		t.Errorf("expected no finding with privileged-only enrol, got %v", got)
 	}
+
+	// Negative: manager approval is required.
+	tpl = baseEnrollable()
+	tpl.MsPKICertificateNameFlag = CTFlagEnrolleeSuppliesSubject
+	tpl.EKUs = []string{"1.3.6.1.5.5.7.3.2"}
+	tpl.RequiresManagerApproval = true
+	if got := (ESC1{}).Check(tpl, nil); len(got) != 0 {
+		t.Errorf("expected no finding when manager approval is required, got %v", got)
+	}
 }
 
 func TestESC2(t *testing.T) {

@@ -19,6 +19,12 @@ func (ESC1) Check(tpl *adcs.Template, _ *adcs.CertificateAuthority) []adcs.Findi
 	if tpl.MsPKICertificateNameFlag&CTFlagEnrolleeSuppliesSubject == 0 {
 		return nil
 	}
+	// Manager approval defeats the attack: the admin must sign off on
+	// every request, so an enrollee-supplied subject never reaches a
+	// cert without human review.
+	if tpl.RequiresManagerApproval {
+		return nil
+	}
 	if !containsAny(tpl.EKUs, ClientAuthEKUs) {
 		return nil
 	}
@@ -31,12 +37,14 @@ func (ESC1) Check(tpl *adcs.Template, _ *adcs.CertificateAuthority) []adcs.Findi
 		Severity: "critical",
 		Title:    "Template allows enrollee-supplied subject with client-auth EKU",
 		Description: "The template grants Enroll (or AutoEnroll) to low-privilege " +
-			"principals, permits the requester to specify the subject, and " +
-			"grants a client-authentication EKU. A low-priv user can enrol " +
-			"a certificate with an arbitrary UPN / SAN and authenticate as " +
-			"any domain principal.",
+			"principals, permits the requester to specify the subject, grants a " +
+			"client-authentication EKU, and does not require manager approval. " +
+			"A low-priv user can enrol a certificate with an arbitrary UPN / SAN " +
+			"and authenticate as any domain principal.",
 		Evidence: map[string]any{
 			"msPKI-Certificate-Name-Flag": tpl.MsPKICertificateNameFlag,
+			"enrollee_supplies_subject":   true,
+			"requires_manager_approval":   false,
 			"EKUs":                        tpl.EKUs,
 			"low_priv_enrollees":          aceSIDs(lowPriv),
 		},

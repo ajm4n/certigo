@@ -26,6 +26,9 @@ type findFlags struct {
 	simpleBind bool
 	format     string
 	out        string
+
+	onlyEnabled    bool
+	onlyVulnerable bool
 }
 
 func newFindCmd() *cobra.Command {
@@ -49,6 +52,8 @@ func newFindCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&f.simpleBind, "simple-bind", false, "use LDAP simple bind instead of NTLM (default: NTLM)")
 	cmd.Flags().StringVar(&f.format, "format", "text", "output format: text|json|zip|bloodhound")
 	cmd.Flags().StringVarP(&f.out, "output", "o", "", "write output to file instead of stdout")
+	cmd.Flags().BoolVar(&f.onlyEnabled, "enabled", false, "only return templates published on at least one CA")
+	cmd.Flags().BoolVar(&f.onlyVulnerable, "vulnerable", false, "only return templates with at least one ESC finding")
 	return cmd
 }
 
@@ -102,6 +107,8 @@ func runFind(f *findFlags) error {
 	adcs.LinkPublishedTemplates(cas, templates)
 	esc.Scan(templates, cas)
 
+	templates = filterTemplates(templates, f.onlyEnabled, f.onlyVulnerable)
+
 	formatter, err := output.Get(f.format)
 	if err != nil {
 		return fmt.Errorf("find: %w", err)
@@ -118,4 +125,26 @@ func runFind(f *findFlags) error {
 	}
 
 	return formatter.Format(w, cas, templates)
+}
+
+// filterTemplates narrows the output per --enabled / --vulnerable. Both
+// flags are AND-ed when both are set.
+func filterTemplates(in []*adcs.Template, onlyEnabled, onlyVulnerable bool) []*adcs.Template {
+	if !onlyEnabled && !onlyVulnerable {
+		return in
+	}
+	out := make([]*adcs.Template, 0, len(in))
+	for _, t := range in {
+		if t == nil {
+			continue
+		}
+		if onlyEnabled && !t.Enabled {
+			continue
+		}
+		if onlyVulnerable && len(t.Findings) == 0 {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
 }
