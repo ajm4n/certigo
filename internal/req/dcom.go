@@ -79,6 +79,8 @@ func submitDCOM(opts Options) (*pki.Certificate, error) {
 	progf("[*]", "dcom: dialing %s:135 for IActivation", opts.CA)
 	scmConn, err := dcerpc.Dial(ctx, net.JoinHostPort(opts.CA, "135"),
 		dcerpc.WithTimeout(Timeout),
+		dcerpc.WithSign(),
+		dcerpc.WithMechanism(ssp.NTLM),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("req: dcom: dial %s:135: %w", opts.CA, err)
@@ -129,6 +131,8 @@ func submitDCOM(opts Options) (*pki.Certificate, error) {
 	)
 	ipidOpts := append(act.OXIDBindings.EndpointsByProtocol("ncacn_ip_tcp"),
 		dcerpc.WithTimeout(Timeout),
+		dcerpc.WithSign(),
+		dcerpc.WithMechanism(ssp.NTLM),
 	)
 	progf("[*]", "dcom: dialing OXID endpoint on ncacn_ip_tcp")
 	ipidConn, err := dcerpc.Dial(ipidCtx, opts.CA, ipidOpts...)
