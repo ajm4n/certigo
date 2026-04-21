@@ -39,7 +39,7 @@ func newReqCmd() *cobra.Command {
 	fl.StringVar(&f.ca, "ca", "", "CA hostname or URL (https:// prefix optional)")
 	fl.StringVar(&f.caName, "ca-name", "", "Enterprise CA common name")
 	fl.StringVar(&f.template, "template", "User", "certificate template name")
-	fl.StringVar(&f.method, "method", "rpc", "submit method: rpc|web (rpc matches certipy's default)")
+	fl.StringVar(&f.method, "method", "dcom", "submit method: dcom|rpc|web (dcom matches certipy's default)")
 	fl.StringVar(&f.upn, "upn", "", "userPrincipalName for SAN")
 	fl.StringVar(&f.subject, "subject", "", "subject DN (default derived from --upn)")
 	fl.StringArrayVar(&f.dns, "dns", nil, "DNS name for SAN (repeatable)")

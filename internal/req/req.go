@@ -39,8 +39,9 @@ func progf(tag, format string, args ...any) {
 type Method string
 
 const (
-	MethodWeb Method = "web"
-	MethodRPC Method = "rpc"
+	MethodDCOM Method = "dcom"
+	MethodRPC  Method = "rpc"
+	MethodWeb  Method = "web"
 )
 
 // Options controls one certificate request.
@@ -59,12 +60,15 @@ type Options struct {
 }
 
 // Submit generates a key + CSR, submits via the chosen method, and returns
-// the issued *pki.Certificate. The default method is RPC (ICPR / MS-WCCE)
-// which matches Certipy's default; use --method web to force the
-// /certsrv/ HTTP flow.
+// the issued *pki.Certificate. The default method is DCOM (MS-WCCE
+// ICertRequestD2::Request2) which matches Certipy's default. --method rpc
+// uses ICertPassage (simpler MSRPC alternative) and --method web uses
+// the /certsrv/ HTTP flow.
 func Submit(opts Options) (*pki.Certificate, error) {
 	switch opts.Method {
-	case MethodRPC, "":
+	case MethodDCOM, "":
+		return submitDCOM(opts)
+	case MethodRPC:
 		return submitRPC(opts)
 	case MethodWeb:
 		return submitWeb(opts)
