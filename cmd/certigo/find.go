@@ -183,6 +183,17 @@ func runFind(f *findFlags) error {
 		format = "short"
 	}
 	output.ShowHowto = f.howto && f.onlyVulnerable
+	if output.ShowHowto {
+		output.HowtoCtx = &esc.ExploitContext{
+			Username: f.username,
+			Password: f.password,
+			Hashes:   f.hashes,
+			Domain:   f.domain,
+			DCHost:   f.dcHost,
+			Method:   "dcom",
+			Insecure: f.insecure,
+		}
+	}
 	formatter, err := output.Get(format)
 	if err != nil {
 		return fmt.Errorf("find: %w", err)

@@ -52,7 +52,7 @@ func (TextFormatter) Format(w io.Writer, cas []*adcs.CertificateAuthority, templ
 			continue
 		}
 		bw.line(fmt.Sprintf("  %d", i))
-		writeTemplate(bw, t)
+		writeTemplate(bw, t, cas)
 		bw.blank()
 	}
 
@@ -100,7 +100,7 @@ func writeCA(bw *bufWriter, ca *adcs.CertificateAuthority) {
 	}
 }
 
-func writeTemplate(bw *bufWriter, t *adcs.Template) {
+func writeTemplate(bw *bufWriter, t *adcs.Template, cas []*adcs.CertificateAuthority) {
 	name := t.DisplayName
 	if name == "" {
 		name = t.Name
@@ -175,11 +175,30 @@ func writeTemplate(bw *bufWriter, t *adcs.Template) {
 			bw.line(line)
 
 			if ShowHowto {
+				// Find the first publishing CA for this template - so the
+				// command has a CA Name + DNS filled in rather than <ca-host>.
 				var ca *adcs.CertificateAuthority
-				// Cheapest lookup: ACL-less caller pass; hints tolerate nil CA.
-				if hint := esc.ExploitHint(f, t, ca); hint != "" {
+				for _, pub := range t.PublishedBy {
+					for _, c := range cas {
+						if c != nil && c.Name == pub {
+							ca = c
+							break
+						}
+					}
+					if ca != nil {
+						break
+					}
+				}
+				ctx, _ := HowtoCtx.(*esc.ExploitContext)
+				var block string
+				if ctx != nil {
+					block = esc.ExploitCommand(f, t, ca, ctx)
+				} else {
+					block = esc.ExploitHint(f, t, ca)
+				}
+				if block != "" {
 					bw.line(indent(3) + "To exploit, run:")
-					for _, l := range strings.Split(hint, "\n") {
+					for _, l := range strings.Split(block, "\n") {
 						bw.line(indent(4) + l)
 					}
 				}
