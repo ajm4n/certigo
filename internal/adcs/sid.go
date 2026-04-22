@@ -2,6 +2,7 @@ package adcs
 
 import (
 	"fmt"
+	"strings"
 
 	goldap "github.com/go-ldap/ldap/v3"
 )
@@ -98,30 +99,99 @@ func NewLDAPSIDResolver(conn *goldap.Conn, domainNC string, extras ...*goldap.Co
 	}
 }
 
-// lookupSIDOnConn issues a base-scope search with the "<SID=...>" bind DN
-// form AD supports. Returns the resolved name or "" on miss / error.
+// lookupSIDOnConn tries two AD-supported resolution paths:
+//   1. Base-scope search against "<SID=...>" bind-DN form. Only works if the
+//      SID lives in the domain this DC serves.
+//   2. Whole-subtree search from "" (forest root on a GC) with a binary-
+//      escaped (objectSid=...) filter. This is what resolves cross-domain
+//      SIDs when the conn is a Global Catalog on port 3268.
+//
+// Returns the resolved name or "" on miss / error.
 func lookupSIDOnConn(conn *goldap.Conn, sid string) string {
+	// Path 1: AD's <SID=...> binding.
 	req := goldap.NewSearchRequest(
 		"<SID="+sid+">",
 		goldap.ScopeBaseObject,
 		goldap.NeverDerefAliases,
 		0, 0, false,
 		"(objectClass=*)",
-		[]string{"sAMAccountName", "name", "objectClass"},
+		[]string{"sAMAccountName", "name"},
 		nil,
 	)
-	res, err := conn.Search(req)
-	if err != nil || len(res.Entries) == 0 {
+	if res, err := conn.Search(req); err == nil && len(res.Entries) > 0 {
+		if v := pickName(res.Entries[0]); v != "" {
+			return v
+		}
+	}
+
+	// Path 2: binary-escaped objectSid filter at the forest root.
+	sidBytes, err := sidStringToBinary(sid)
+	if err != nil {
 		return ""
 	}
-	entry := res.Entries[0]
-	if v := entry.GetAttributeValue("sAMAccountName"); v != "" {
-		return v
-	}
-	if v := entry.GetAttributeValue("name"); v != "" {
-		return v
+	filter := "(objectSid=" + ldapEscapeBinary(sidBytes) + ")"
+	req = goldap.NewSearchRequest(
+		"",
+		goldap.ScopeWholeSubtree,
+		goldap.NeverDerefAliases,
+		1, 0, false,
+		filter,
+		[]string{"sAMAccountName", "name"},
+		nil,
+	)
+	if res, err := conn.Search(req); err == nil && len(res.Entries) > 0 {
+		if v := pickName(res.Entries[0]); v != "" {
+			return v
+		}
 	}
 	return ""
+}
+
+func pickName(e *goldap.Entry) string {
+	if v := e.GetAttributeValue("sAMAccountName"); v != "" {
+		return v
+	}
+	return e.GetAttributeValue("name")
+}
+
+// sidStringToBinary is the inverse of SIDFromBytes per MS-DTYP §2.4.2.2.
+func sidStringToBinary(sid string) ([]byte, error) {
+	parts := strings.Split(sid, "-")
+	if len(parts) < 3 || parts[0] != "S" {
+		return nil, fmt.Errorf("invalid SID %q", sid)
+	}
+	var rev uint64
+	fmt.Sscanf(parts[1], "%d", &rev)
+	var idAuth uint64
+	fmt.Sscanf(parts[2], "%d", &idAuth)
+	subs := parts[3:]
+	out := make([]byte, 0, 8+4*len(subs))
+	out = append(out, byte(rev), byte(len(subs)))
+	var ia [8]byte
+	for i := 0; i < 8; i++ {
+		ia[7-i] = byte(idAuth >> (8 * i))
+	}
+	out = append(out, ia[2:]...) // trim upper 2 bytes, big-endian 6
+	for _, s := range subs {
+		var v uint32
+		fmt.Sscanf(s, "%d", &v)
+		out = append(out, byte(v), byte(v>>8), byte(v>>16), byte(v>>24))
+	}
+	return out, nil
+}
+
+// ldapEscapeBinary formats b as \xx\xx... for use inside an LDAP filter
+// value. Every byte is escaped (RFC 4515 §3) to avoid special chars.
+func ldapEscapeBinary(b []byte) string {
+	var sb strings.Builder
+	sb.Grow(len(b) * 3)
+	const hex = "0123456789abcdef"
+	for _, c := range b {
+		sb.WriteByte('\\')
+		sb.WriteByte(hex[c>>4])
+		sb.WriteByte(hex[c&0x0f])
+	}
+	return sb.String()
 }
 
 // ResolveSIDs walks every ACE on every CA and Template and populates the

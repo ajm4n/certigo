@@ -146,6 +146,8 @@ func runFind(f *findFlags) error {
 		gcConn = gc
 		defer func() { _ = gc.Close() }()
 		p.Infof("Global Catalog bound on :3268 for cross-domain SID resolution")
+	} else {
+		p.Warnf("Global Catalog dial failed on :3268 (%v); cross-domain SIDs will render as raw", gerr)
 	}
 	adcs.ResolveSIDs(adcs.NewLDAPSIDResolver(conn, domainNC, gcConn), cas, templates)
 
