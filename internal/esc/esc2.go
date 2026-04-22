@@ -23,6 +23,11 @@ func (ESC2) Check(tpl *adcs.Template, _ *adcs.CertificateAuthority) []adcs.Findi
 	if !hasAnyPurpose && !noEKU {
 		return nil
 	}
+	// Manager approval defeats the attack: reviewer sees the request
+	// before a cert usable for any purpose is issued.
+	if tpl.RequiresManagerApproval {
+		return nil
+	}
 	lowPriv := templateEnrollableByLowPriv(tpl)
 	if len(lowPriv) == 0 {
 		return nil
@@ -40,9 +45,10 @@ func (ESC2) Check(tpl *adcs.Template, _ *adcs.CertificateAuthority) []adcs.Findi
 			"restriction (" + reason + "). The resulting certificate is " +
 			"usable for client authentication and other purposes.",
 		Evidence: map[string]any{
-			"EKUs":               tpl.EKUs,
-			"low_priv_enrollees": aceSIDs(lowPriv),
-			"reason":             reason,
+			"EKUs":                      tpl.EKUs,
+			"low_priv_enrollees":        aceSIDs(lowPriv),
+			"requires_manager_approval": false,
+			"reason":                    reason,
 		},
 	}}
 }

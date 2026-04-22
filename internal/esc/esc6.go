@@ -24,6 +24,11 @@ func (ESC6) Check(tpl *adcs.Template, ca *adcs.CertificateAuthority) []adcs.Find
 	if !containsAny(tpl.EKUs, ClientAuthEKUs) && len(tpl.EKUs) > 0 {
 		return nil
 	}
+	// Manager approval on the template defeats the attack: reviewer sees
+	// the attacker-supplied SAN in the request before the cert is issued.
+	if tpl.RequiresManagerApproval {
+		return nil
+	}
 	return []adcs.Finding{{
 		ESC:      "ESC6",
 		Severity: "critical",

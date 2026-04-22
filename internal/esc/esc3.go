@@ -18,6 +18,11 @@ func (ESC3) Check(tpl *adcs.Template, _ *adcs.CertificateAuthority) []adcs.Findi
 	if !contains(tpl.EKUs, CertRequestAgentEKU) {
 		return nil
 	}
+	// Manager approval defeats the attack: reviewer vets the request
+	// before an enrollment-agent cert is issued.
+	if tpl.RequiresManagerApproval {
+		return nil
+	}
 	lowPriv := templateEnrollableByLowPriv(tpl)
 	if len(lowPriv) == 0 {
 		return nil
@@ -31,8 +36,9 @@ func (ESC3) Check(tpl *adcs.Template, _ *adcs.CertificateAuthority) []adcs.Findi
 			"low-privilege principals. A holder of the resulting cert " +
 			"can sign enrolment requests on behalf of arbitrary users.",
 		Evidence: map[string]any{
-			"EKUs":               tpl.EKUs,
-			"low_priv_enrollees": aceSIDs(lowPriv),
+			"EKUs":                      tpl.EKUs,
+			"requires_manager_approval": false,
+			"low_priv_enrollees":        aceSIDs(lowPriv),
 		},
 	}}
 }

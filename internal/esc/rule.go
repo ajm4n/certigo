@@ -97,7 +97,7 @@ func Scan(templates []*adcs.Template, cas []*adcs.CertificateAuthority) int {
 // findings don't fan out across every published template.
 func isCALevelRule(name string) bool {
 	switch name {
-	case "ESC8", "ESC11":
+	case "ESC6", "ESC8", "ESC11":
 		return true
 	}
 	return false

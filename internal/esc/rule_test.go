@@ -115,6 +115,12 @@ func TestESC2(t *testing.T) {
 	if len(findings) != 1 {
 		t.Fatalf("want finding with no EKUs, got %v", findings)
 	}
+
+	// Negative: manager approval defeats the attack.
+	tpl.RequiresManagerApproval = true
+	if got := (ESC2{}).Check(tpl, nil); len(got) != 0 {
+		t.Errorf("expected no ESC2 when manager approval is required, got %v", got)
+	}
 }
 
 func TestESC3(t *testing.T) {
@@ -130,6 +136,13 @@ func TestESC3(t *testing.T) {
 	tpl.EKUs = []string{"1.3.6.1.5.5.7.3.2"}
 	if got := (ESC3{}).Check(tpl, nil); len(got) != 0 {
 		t.Errorf("expected no finding without CRA EKU, got %v", got)
+	}
+
+	// Negative: manager approval defeats the attack.
+	tpl.EKUs = []string{CertRequestAgentEKU}
+	tpl.RequiresManagerApproval = true
+	if got := (ESC3{}).Check(tpl, nil); len(got) != 0 {
+		t.Errorf("expected no ESC3 when manager approval is required, got %v", got)
 	}
 }
 
@@ -172,6 +185,13 @@ func TestESC6(t *testing.T) {
 	ca.EditFlags = 0
 	if got := (ESC6{}).Check(tpl, ca); len(got) != 0 {
 		t.Errorf("expected no finding when SAN2 flag cleared, got %v", got)
+	}
+
+	// Negative: manager approval on template defeats the attack.
+	ca.EditFlags = EditFlagAttributeSubjectAltName2
+	tpl.RequiresManagerApproval = true
+	if got := (ESC6{}).Check(tpl, ca); len(got) != 0 {
+		t.Errorf("expected no ESC6 when manager approval is required, got %v", got)
 	}
 }
 
@@ -354,6 +374,14 @@ func TestESC16(t *testing.T) {
 	findings := ESC16{}.Check(tpl, nil)
 	if len(findings) != 1 || findings[0].ESC != "ESC16" {
 		t.Fatalf("want ESC16 finding, got %v", findings)
+	}
+
+	// Negative: only MsPKICertificatePolicies (issuance policies) -> ESC13
+	// territory, ESC16 should stay quiet.
+	tpl.ApplicationPolicies = nil
+	tpl.MsPKICertificatePolicies = []string{"1.2.3.4"}
+	if got := (ESC16{}).Check(tpl, nil); len(got) != 0 {
+		t.Errorf("expected no ESC16 with only issuance policies, got %v", got)
 	}
 }
 
