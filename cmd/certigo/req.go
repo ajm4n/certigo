@@ -69,6 +69,12 @@ func newReqCmd() *cobra.Command {
 	fl.StringVar(&f.dcHost, "dc-host", "", "domain controller (enables CA fallback discovery + DNS resolution)")
 	fl.BoolVar(&f.noAutoFallback, "no-auto-fallback", false, "don't discover other CAs publishing the template")
 	fl.BoolVar(&f.webOnDenied, "web-on-denied", false, "on ACCESS_DENIED from DCOM, retry every CA via /certsrv/ web enrollment")
+
+	// Backwards compatibility: --auto-fallback used to opt into discovery.
+	// It's now default-on; keep the flag so old command lines don't break.
+	var legacyAutoFallback bool
+	fl.BoolVar(&legacyAutoFallback, "auto-fallback", false, "(default behavior; kept for backwards compatibility)")
+	_ = fl.MarkHidden("auto-fallback")
 	return cmd
 }
 
