@@ -42,8 +42,8 @@ func ExploitCommand(f adcs.Finding, tpl *adcs.Template, ca *adcs.CertificateAuth
 		}
 	}
 	// Values that may contain spaces need single-quoting in the emitted
-	// shell command; otherwise '<redacted> Production Issuing CA 1' splits
-	// into four args.
+	// shell command; otherwise a CA display name like 'Corp Issuing CA 1'
+	// splits into multiple args.
 	caNameQ := shellQuote(caName)
 	tplNameQ := shellQuote(tplName)
 
