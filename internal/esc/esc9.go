@@ -21,6 +21,21 @@ func (ESC9) Check(tpl *adcs.Template, _ *adcs.CertificateAuthority) []adcs.Findi
 	if tpl.MsPKICertificateNameFlag&CTFlagNoSecurityExtension == 0 {
 		return nil
 	}
+	// ESC9 is the weak-binding-via-UPN-spoof attack. That requires the
+	// requester to be able to dictate the UPN / SAN on the CSR. Without
+	// CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT or its SAN variant, the attacker
+	// can't forge an identity even though the SID extension is missing.
+	suppliesIdentity := tpl.MsPKICertificateNameFlag&CTFlagEnrolleeSuppliesSubject != 0 ||
+		tpl.MsPKICertificateNameFlag&CTFlagEnrolleeSuppliesSubjectAltName != 0
+	if !suppliesIdentity {
+		return nil
+	}
+	if tpl.RequiresManagerApproval {
+		return nil
+	}
+	if !containsAny(tpl.EKUs, ClientAuthEKUs) {
+		return nil
+	}
 	lowPriv := templateEnrollableByLowPriv(tpl)
 	if len(lowPriv) == 0 {
 		return nil
@@ -37,6 +52,9 @@ func (ESC9) Check(tpl *adcs.Template, _ *adcs.CertificateAuthority) []adcs.Findi
 			"(Full Enforcement).",
 		Evidence: map[string]any{
 			"msPKI-Certificate-Name-Flag": tpl.MsPKICertificateNameFlag,
+			"enrollee_supplies_identity":  true,
+			"requires_manager_approval":   false,
+			"EKUs":                        tpl.EKUs,
 			"low_priv_enrollees":          aceSIDs(lowPriv),
 			"incomplete":                  "requires DC registry probe to confirm exploitability",
 		},

@@ -217,15 +217,33 @@ func TestESC8(t *testing.T) {
 func TestESC9(t *testing.T) {
 	t.Parallel()
 	tpl := baseEnrollable()
-	tpl.MsPKICertificateNameFlag = CTFlagNoSecurityExtension
+	// ESC9 requires NO_SECURITY_EXTENSION AND enrollee-supplied identity
+	// AND client-auth EKU AND no manager approval.
+	tpl.MsPKICertificateNameFlag = CTFlagNoSecurityExtension | CTFlagEnrolleeSuppliesSubject
+	tpl.EKUs = []string{"1.3.6.1.5.5.7.3.2"}
 	findings := ESC9{}.Check(tpl, nil)
 	if len(findings) != 1 || findings[0].ESC != "ESC9" {
 		t.Fatalf("want ESC9 finding, got %v", findings)
 	}
 
-	tpl.MsPKICertificateNameFlag = 0
+	// Negative: no enrollee-supplied identity.
+	tpl.MsPKICertificateNameFlag = CTFlagNoSecurityExtension
 	if got := (ESC9{}).Check(tpl, nil); len(got) != 0 {
-		t.Errorf("expected no finding without CT_FLAG_NO_SECURITY_EXTENSION, got %v", got)
+		t.Errorf("expected no ESC9 without enrollee-supplied identity, got %v", got)
+	}
+
+	// Negative: manager approval required.
+	tpl.MsPKICertificateNameFlag = CTFlagNoSecurityExtension | CTFlagEnrolleeSuppliesSubject
+	tpl.RequiresManagerApproval = true
+	if got := (ESC9{}).Check(tpl, nil); len(got) != 0 {
+		t.Errorf("expected no ESC9 when manager approval is required, got %v", got)
+	}
+
+	// Negative: NO_SECURITY_EXTENSION cleared.
+	tpl.MsPKICertificateNameFlag = 0
+	tpl.RequiresManagerApproval = false
+	if got := (ESC9{}).Check(tpl, nil); len(got) != 0 {
+		t.Errorf("expected no ESC9 without CT_FLAG_NO_SECURITY_EXTENSION, got %v", got)
 	}
 }
 
@@ -241,6 +259,12 @@ func TestESC10(t *testing.T) {
 	}
 	if findings[0].Evidence["incomplete"] == nil {
 		t.Error("ESC10 evidence should carry 'incomplete' marker")
+	}
+
+	// Negative: manager approval defeats the attack.
+	tpl.RequiresManagerApproval = true
+	if got := (ESC10{}).Check(tpl, nil); len(got) != 0 {
+		t.Errorf("expected no ESC10 when manager approval is required, got %v", got)
 	}
 }
 
@@ -291,6 +315,12 @@ func TestESC14(t *testing.T) {
 	if len(findings) != 1 || findings[0].ESC != "ESC14" {
 		t.Fatalf("want ESC14 finding, got %v", findings)
 	}
+
+	// Negative: manager approval defeats the attack.
+	tpl.RequiresManagerApproval = true
+	if got := (ESC14{}).Check(tpl, nil); len(got) != 0 {
+		t.Errorf("expected no ESC14 when manager approval is required, got %v", got)
+	}
 }
 
 func TestESC15(t *testing.T) {
@@ -307,6 +337,13 @@ func TestESC15(t *testing.T) {
 	tpl.MsPKICertificateNameFlag = CTFlagEnrolleeSuppliesSubject
 	if got := (ESC15{}).Check(tpl, nil); len(got) != 0 {
 		t.Errorf("expected no ESC15 without NO_SECURITY_EXTENSION, got %v", got)
+	}
+
+	// Negative: manager approval defeats the attack.
+	tpl.MsPKICertificateNameFlag = CTFlagEnrolleeSuppliesSubject | CTFlagNoSecurityExtension
+	tpl.RequiresManagerApproval = true
+	if got := (ESC15{}).Check(tpl, nil); len(got) != 0 {
+		t.Errorf("expected no ESC15 when manager approval is required, got %v", got)
 	}
 }
 
@@ -343,6 +380,32 @@ func TestScan_AccumulatesFindings(t *testing.T) {
 	}
 	if f := findingByESC(t, tpl.Findings, "ESC6"); f == nil {
 		t.Error("expected ESC6 in scan output")
+	}
+}
+
+func TestScan_DedupesCALevelFindings(t *testing.T) {
+	t.Parallel()
+	// Two templates both published by the same CA. ESC11 fires against
+	// the CA itself, so Scan should only attach it once (to the first
+	// template) instead of fanning out to every template.
+	ca := &adcs.CertificateAuthority{
+		Name:  "CORP-CA",
+		Flags: 0x00000100, // non-zero, encrypt-ICPR bit absent
+	}
+	tpl1 := baseEnrollable()
+	tpl1.Name = "Tpl1"
+	tpl1.PublishedBy = []string{"CORP-CA"}
+	tpl2 := baseEnrollable()
+	tpl2.Name = "Tpl2"
+	tpl2.PublishedBy = []string{"CORP-CA"}
+
+	Scan([]*adcs.Template{tpl1, tpl2}, []*adcs.CertificateAuthority{ca})
+
+	esc11On1 := findingByESC(t, tpl1.Findings, "ESC11") != nil
+	esc11On2 := findingByESC(t, tpl2.Findings, "ESC11") != nil
+	if !(esc11On1 != esc11On2) {
+		t.Errorf("ESC11 should attach to exactly one template, got tpl1=%v tpl2=%v",
+			esc11On1, esc11On2)
 	}
 }
 

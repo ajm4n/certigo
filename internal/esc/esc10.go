@@ -30,6 +30,11 @@ func (ESC10) Check(tpl *adcs.Template, _ *adcs.CertificateAuthority) []adcs.Find
 	if !containsAny(tpl.EKUs, ClientAuthEKUs) {
 		return nil
 	}
+	// Manager approval defeats the attack: an admin reviews every request
+	// before issuance, so attacker-supplied SAN/UPN values don't land.
+	if tpl.RequiresManagerApproval {
+		return nil
+	}
 	lowPriv := templateEnrollableByLowPriv(tpl)
 	if len(lowPriv) == 0 {
 		return nil
@@ -46,6 +51,7 @@ func (ESC10) Check(tpl *adcs.Template, _ *adcs.CertificateAuthority) []adcs.Find
 		Evidence: map[string]any{
 			"msPKI-Certificate-Name-Flag": tpl.MsPKICertificateNameFlag,
 			"EKUs":                        tpl.EKUs,
+			"requires_manager_approval":   false,
 			"low_priv_enrollees":          aceSIDs(lowPriv),
 			"incomplete":                  "requires DC registry probe for definitive exploitability",
 		},

@@ -58,6 +58,16 @@ func Scan(templates []*adcs.Template, cas []*adcs.CertificateAuthority) int {
 
 	rules := AllRules()
 	total := 0
+	// caLevelSeen deduplicates findings that describe the CA rather than the
+	// template (e.g., ESC11 - CA doesn't enforce ICPR encryption). Without
+	// this, every template published by a vulnerable CA gets the same
+	// finding attached, which drowns the output.
+	caLevelSeen := make(map[string]map[string]bool) // rule name -> set of CA names
+	for _, r := range rules {
+		if isCALevelRule(r.Name()) {
+			caLevelSeen[r.Name()] = make(map[string]bool)
+		}
+	}
 	for _, tpl := range templates {
 		if tpl == nil {
 			continue
@@ -65,13 +75,32 @@ func Scan(templates []*adcs.Template, cas []*adcs.CertificateAuthority) int {
 		ca := firstPublishingCA(tpl, caByName)
 		for _, r := range rules {
 			findings := r.Check(tpl, ca)
-			if len(findings) > 0 {
-				tpl.Findings = append(tpl.Findings, findings...)
-				total += len(findings)
+			if len(findings) == 0 {
+				continue
 			}
+			if seen, isCAScoped := caLevelSeen[r.Name()]; isCAScoped && ca != nil {
+				if seen[ca.Name] {
+					continue
+				}
+				seen[ca.Name] = true
+			}
+			tpl.Findings = append(tpl.Findings, findings...)
+			total += len(findings)
 		}
 	}
 	return total
+}
+
+// isCALevelRule reports whether a rule describes a CA-wide misconfiguration
+// (as opposed to a per-template one). Scan uses this to emit the finding
+// against only the first template it encounters per CA, so CA-level
+// findings don't fan out across every published template.
+func isCALevelRule(name string) bool {
+	switch name {
+	case "ESC8", "ESC11":
+		return true
+	}
+	return false
 }
 
 // firstPublishingCA returns the first CA that lists the template as
