@@ -2,27 +2,53 @@ package adcs
 
 import "strings"
 
-// MarkEnrollableTemplates walks each template's Enrollment + AutoEnroll
-// ACEs and sets Template.EnrollableByCurrentUser whenever at least one
-// ACE's SID is in identitySet AND that ACE actually grants the Enroll
-// (ControlAccess) right. A read-only ACE like "Authenticated Users
-// (ReadControl|ReadProperty)" does NOT make a template enrollable even
-// though the principal is in the set, and previously this function
-// over-reported enrollability. identitySet is the value returned by
-// IdentitySet() for the currently-bound principal. Safe to call with a
-// nil / empty set - all templates simply retain EnrollableByCurrentUser
-// false.
-func MarkEnrollableTemplates(templates []*Template, identitySet map[string]bool) {
+// MarkEnrollableTemplates sets Template.EnrollableByCurrentUser only when
+// BOTH of these hold for the supplied principal (identitySet):
+//
+//  1. At least one ACE on the template grants Enroll (ControlAccess).
+//  2. At least one of the CAs that publishes the template grants
+//     Enroll to the same principal.
+//
+// Without the second check we over-reported templates as enrollable
+// whenever their DACL had "Authenticated Users (ControlAccess)" - the
+// CA object itself frequently restricts who can actually request a
+// cert, and DCOM activation fails with ACCESS_DENIED even though the
+// template would permit the request.
+//
+// Safe to call with a nil / empty identitySet; every template simply
+// keeps EnrollableByCurrentUser false.
+func MarkEnrollableTemplates(templates []*Template, cas []*CertificateAuthority, identitySet map[string]bool) {
 	if len(identitySet) == 0 {
 		return
+	}
+	caByName := make(map[string]*CertificateAuthority, len(cas))
+	for _, c := range cas {
+		if c != nil && c.Name != "" {
+			caByName[c.Name] = c
+		}
 	}
 	for _, t := range templates {
 		if t == nil {
 			continue
 		}
-		if enrollAceMatches(t.EnrollmentRights, identitySet) ||
-			enrollAceMatches(t.AutoEnrollRights, identitySet) {
-			t.EnrollableByCurrentUser = true
+		// Template-level enrollment permission.
+		if !enrollAceMatches(t.EnrollmentRights, identitySet) &&
+			!enrollAceMatches(t.AutoEnrollRights, identitySet) {
+			continue
+		}
+		// CA-level enrollment permission: at least one publishing CA must
+		// also grant Enroll (ControlAccess) to the principal. A template
+		// with no PublishedBy list is effectively unreachable, so it
+		// stays false.
+		for _, caName := range t.PublishedBy {
+			ca, ok := caByName[caName]
+			if !ok || ca == nil {
+				continue
+			}
+			if enrollAceMatches(ca.EnrollmentRights, identitySet) {
+				t.EnrollableByCurrentUser = true
+				break
+			}
 		}
 	}
 }

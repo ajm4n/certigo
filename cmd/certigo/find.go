@@ -153,7 +153,7 @@ func runFind(f *findFlags) error {
 
 	p.Infof("Resolving current user group memberships")
 	if idents, err := adcs.IdentitySet(conn, creds.Username, domainNC); err == nil {
-		adcs.MarkEnrollableTemplates(templates, idents)
+		adcs.MarkEnrollableTemplates(templates, cas, idents)
 		p.OKf("Current principal in %d groups", len(idents))
 	} else {
 		p.Warnf("Could not resolve identity set: %v", err)
