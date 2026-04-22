@@ -3,20 +3,20 @@ package adcs
 import "strings"
 
 // MarkEnrollableTemplates sets Template.EnrollableByCurrentUser only when
-// BOTH of these hold for the supplied principal (identitySet):
+// every check below passes for the supplied principal (identitySet):
 //
-//  1. At least one ACE on the template grants Enroll (ControlAccess).
-//  2. At least one of the CAs that publishes the template grants
-//     Enroll to the same principal.
+//  1. No DENY ACE on the template denies Enroll to a SID in the set.
+//  2. At least one ALLOW ACE on the template grants Enroll (ControlAccess).
+//  3. No DENY ACE on a publishing CA denies Enroll to the principal, and
+//     at least one publishing CA ALLOW-grants Enroll.
 //
-// Without the second check we over-reported templates as enrollable
-// whenever their DACL had "Authenticated Users (ControlAccess)" - the
-// CA object itself frequently restricts who can actually request a
-// cert, and DCOM activation fails with ACCESS_DENIED even though the
-// template would permit the request.
+// DENY ACEs win over ALLOW (AD evaluates them first). Without this
+// ordering a template like "Cert-Machine-Block-GS (DENY|ControlAccess) +
+// Authenticated Users (ControlAccess)" was reported as enrollable for
+// every authenticated principal - even the ones explicitly blocked.
 //
-// Safe to call with a nil / empty identitySet; every template simply
-// keeps EnrollableByCurrentUser false.
+// Safe to call with a nil / empty identitySet; every template keeps
+// EnrollableByCurrentUser false.
 func MarkEnrollableTemplates(templates []*Template, cas []*CertificateAuthority, identitySet map[string]bool) {
 	if len(identitySet) == 0 {
 		return
@@ -31,21 +31,26 @@ func MarkEnrollableTemplates(templates []*Template, cas []*CertificateAuthority,
 		if t == nil {
 			continue
 		}
-		// Template-level enrollment permission.
-		if !enrollAceMatches(t.EnrollmentRights, identitySet) &&
-			!enrollAceMatches(t.AutoEnrollRights, identitySet) {
+		// Template-level gate.
+		if denyEnrollMatches(t.EnrollmentRights, identitySet) ||
+			denyEnrollMatches(t.AutoEnrollRights, identitySet) {
 			continue
 		}
-		// CA-level enrollment permission: at least one publishing CA must
-		// also grant Enroll (ControlAccess) to the principal. A template
-		// with no PublishedBy list is effectively unreachable, so it
-		// stays false.
+		if !allowEnrollMatches(t.EnrollmentRights, identitySet) &&
+			!allowEnrollMatches(t.AutoEnrollRights, identitySet) {
+			continue
+		}
+		// CA-level gate: at least one publishing CA must ALLOW and not
+		// DENY. Templates with no PublishedBy are unreachable.
 		for _, caName := range t.PublishedBy {
 			ca, ok := caByName[caName]
 			if !ok || ca == nil {
 				continue
 			}
-			if enrollAceMatches(ca.EnrollmentRights, identitySet) {
+			if denyEnrollMatches(ca.EnrollmentRights, identitySet) {
+				continue
+			}
+			if allowEnrollMatches(ca.EnrollmentRights, identitySet) {
 				t.EnrollableByCurrentUser = true
 				break
 			}
@@ -53,14 +58,31 @@ func MarkEnrollableTemplates(templates []*Template, cas []*CertificateAuthority,
 	}
 }
 
-// enrollAceMatches reports whether any ACE in aces grants enrollment
-// (ControlAccess mask) to a principal whose SID is in set.
-func enrollAceMatches(aces []Ace, set map[string]bool) bool {
+// allowEnrollMatches reports whether any ALLOW ACE in aces grants
+// ControlAccess to a SID in set.
+func allowEnrollMatches(aces []Ace, set map[string]bool) bool {
 	for _, a := range aces {
 		if !set[a.SID] {
 			continue
 		}
+		if strings.Contains(a.Rights, "DENY") {
+			continue
+		}
 		if strings.Contains(a.Rights, "ControlAccess") {
+			return true
+		}
+	}
+	return false
+}
+
+// denyEnrollMatches reports whether any DENY ACE in aces denies
+// ControlAccess to a SID in set.
+func denyEnrollMatches(aces []Ace, set map[string]bool) bool {
+	for _, a := range aces {
+		if !set[a.SID] {
+			continue
+		}
+		if strings.Contains(a.Rights, "DENY") && strings.Contains(a.Rights, "ControlAccess") {
 			return true
 		}
 	}

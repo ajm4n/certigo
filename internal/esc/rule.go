@@ -128,16 +128,17 @@ func templateEnrollableByLowPriv(tpl *adcs.Template) []adcs.Ace {
 	return lowPrivAces(combined)
 }
 
-// enrollAces filters an ACE list to only those that grant enrollment
-// (the ControlAccess mask bit, which covers both the generic Extended-
-// Right and the Enrollment / AutoEnrollment specific rights that the CA
-// treats as "may request a certificate"). The SD parser surfaces every
-// ACE with a rights summary string; we filter by substring because the
-// summary is fully rendered ("ControlAccess|WriteProperty|ReadProperty"
-// etc).
+// enrollAces filters an ACE list to ALLOW aces that grant enrollment
+// (ControlAccess). DENY aces are excluded - they don't make a template
+// enrollable, they make it un-enrollable for the denied principal.
+// A template protected by "Cert-Machine-Block-GS (DENY|ControlAccess)"
+// was previously mis-reported as low-priv-enrollable.
 func enrollAces(aces []adcs.Ace) []adcs.Ace {
 	out := make([]adcs.Ace, 0, len(aces))
 	for _, a := range aces {
+		if strings.Contains(a.Rights, "DENY") {
+			continue
+		}
 		if strings.Contains(a.Rights, "ControlAccess") {
 			out = append(out, a)
 		}
