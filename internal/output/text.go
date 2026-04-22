@@ -172,9 +172,6 @@ func writeTemplate(bw *bufWriter, t *adcs.Template) {
 			if title != "" {
 				line = fmt.Sprintf("%s - %s", line, title)
 			}
-			if f.Severity != "" {
-				line = fmt.Sprintf("%s (%s)", line, f.Severity)
-			}
 			bw.line(line)
 
 			if ShowHowto {
