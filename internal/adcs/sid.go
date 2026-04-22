@@ -2,6 +2,7 @@ package adcs
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	goldap "github.com/go-ldap/ldap/v3"
@@ -10,29 +11,29 @@ import (
 // WellKnownSIDs maps built-in Windows SIDs to their friendly names.
 // Domain-specific SIDs (S-1-5-21-...) are resolved via LDAP.
 var WellKnownSIDs = map[string]string{
-	"S-1-0-0":       "Null SID",
-	"S-1-1-0":       "Everyone",
-	"S-1-2-0":       "Local",
-	"S-1-2-1":       "Console Logon",
-	"S-1-3-0":       "Creator Owner",
-	"S-1-3-1":       "Creator Group",
-	"S-1-5-1":       "Dialup",
-	"S-1-5-2":       "Network",
-	"S-1-5-3":       "Batch",
-	"S-1-5-4":       "Interactive",
-	"S-1-5-6":       "Service",
-	"S-1-5-7":       "Anonymous",
-	"S-1-5-9":       "Enterprise Domain Controllers",
-	"S-1-5-10":      "Principal Self",
-	"S-1-5-11":      "Authenticated Users",
-	"S-1-5-12":      "Restricted Code",
-	"S-1-5-13":      "Terminal Server Users",
-	"S-1-5-14":      "Remote Interactive Logon",
-	"S-1-5-15":      "This Organization",
-	"S-1-5-17":      "IUsr",
-	"S-1-5-18":      "Local System",
-	"S-1-5-19":      "NT Authority (Local Service)",
-	"S-1-5-20":      "NT Authority (Network Service)",
+	"S-1-0-0":      "Null SID",
+	"S-1-1-0":      "Everyone",
+	"S-1-2-0":      "Local",
+	"S-1-2-1":      "Console Logon",
+	"S-1-3-0":      "Creator Owner",
+	"S-1-3-1":      "Creator Group",
+	"S-1-5-1":      "Dialup",
+	"S-1-5-2":      "Network",
+	"S-1-5-3":      "Batch",
+	"S-1-5-4":      "Interactive",
+	"S-1-5-6":      "Service",
+	"S-1-5-7":      "Anonymous",
+	"S-1-5-9":      "Enterprise Domain Controllers",
+	"S-1-5-10":     "Principal Self",
+	"S-1-5-11":     "Authenticated Users",
+	"S-1-5-12":     "Restricted Code",
+	"S-1-5-13":     "Terminal Server Users",
+	"S-1-5-14":     "Remote Interactive Logon",
+	"S-1-5-15":     "This Organization",
+	"S-1-5-17":     "IUsr",
+	"S-1-5-18":     "Local System",
+	"S-1-5-19":     "NT Authority (Local Service)",
+	"S-1-5-20":     "NT Authority (Network Service)",
 	"S-1-5-32-544": "BUILTIN\\Administrators",
 	"S-1-5-32-545": "BUILTIN\\Users",
 	"S-1-5-32-546": "BUILTIN\\Guests",
@@ -100,11 +101,11 @@ func NewLDAPSIDResolver(conn *goldap.Conn, domainNC string, extras ...*goldap.Co
 }
 
 // lookupSIDOnConn tries two AD-supported resolution paths:
-//   1. Base-scope search against "<SID=...>" bind-DN form. Only works if the
-//      SID lives in the domain this DC serves.
-//   2. Whole-subtree search from "" (forest root on a GC) with a binary-
-//      escaped (objectSid=...) filter. This is what resolves cross-domain
-//      SIDs when the conn is a Global Catalog on port 3268.
+//  1. Base-scope search against "<SID=...>" bind-DN form. Only works if the
+//     SID lives in the domain this DC serves.
+//  2. Whole-subtree search from "" (forest root on a GC) with a binary-
+//     escaped (objectSid=...) filter. This is what resolves cross-domain
+//     SIDs when the conn is a Global Catalog on port 3268.
 //
 // Returns the resolved name or "" on miss / error.
 func lookupSIDOnConn(conn *goldap.Conn, sid string) string {
@@ -160,10 +161,14 @@ func sidStringToBinary(sid string) ([]byte, error) {
 	if len(parts) < 3 || parts[0] != "S" {
 		return nil, fmt.Errorf("invalid SID %q", sid)
 	}
-	var rev uint64
-	fmt.Sscanf(parts[1], "%d", &rev)
-	var idAuth uint64
-	fmt.Sscanf(parts[2], "%d", &idAuth)
+	rev, err := strconv.ParseUint(parts[1], 10, 8)
+	if err != nil {
+		return nil, fmt.Errorf("invalid SID revision %q: %w", parts[1], err)
+	}
+	idAuth, err := strconv.ParseUint(parts[2], 10, 48)
+	if err != nil {
+		return nil, fmt.Errorf("invalid SID identifier authority %q: %w", parts[2], err)
+	}
 	subs := parts[3:]
 	out := make([]byte, 0, 8+4*len(subs))
 	out = append(out, byte(rev), byte(len(subs)))
@@ -173,8 +178,10 @@ func sidStringToBinary(sid string) ([]byte, error) {
 	}
 	out = append(out, ia[2:]...) // trim upper 2 bytes, big-endian 6
 	for _, s := range subs {
-		var v uint32
-		fmt.Sscanf(s, "%d", &v)
+		v, err := strconv.ParseUint(s, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("invalid SID sub-authority %q: %w", s, err)
+		}
 		out = append(out, byte(v), byte(v>>8), byte(v>>16), byte(v>>24))
 	}
 	return out, nil

@@ -31,11 +31,11 @@ var (
 //   - Credentials.UseKerberos       GSSAPI/SPNEGO bind with a gokrb5 client
 //   - Credentials.HasNTHash()       NTLM bind (pass-the-hash) via go-ldap
 //   - Credentials.HasPassword()     NTLM bind with plaintext password. AD's
-//                                   simple bind rejects machine accounts and
-//                                   refuses plaintext auth whenever LDAP
-//                                   signing is enforced, so NTLM is the
-//                                   default. Set Credentials.UseSimpleBind =
-//                                   true to opt into the legacy behavior.
+//     simple bind rejects machine accounts and
+//     refuses plaintext auth whenever LDAP
+//     signing is enforced, so NTLM is the
+//     default. Set Credentials.UseSimpleBind =
+//     true to opt into the legacy behavior.
 //   - Credentials.HasCertificate()  deferred; returns ErrCertAuthDeferred
 //
 // The spn argument is required for Kerberos (e.g. "ldap/dc01.ctg.local").

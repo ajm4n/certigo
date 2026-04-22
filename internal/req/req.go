@@ -147,9 +147,9 @@ func postCertSrv(opts Options, csrDER []byte) (*x509.Certificate, error) {
 
 	progf("[*]", "connecting to %s (timeout %s)", base, Timeout)
 	transport := &http.Transport{
-		TLSClientConfig:   &tls.Config{InsecureSkipVerify: opts.TLSInsecure}, // #nosec G402 - opt-in via --insecure-tls
-		DialContext:       (&net.Dialer{Timeout: Timeout, KeepAlive: 30 * time.Second}).DialContext,
-		TLSHandshakeTimeout: Timeout,
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: opts.TLSInsecure}, // #nosec G402 - opt-in via --insecure-tls
+		DialContext:           (&net.Dialer{Timeout: Timeout, KeepAlive: 30 * time.Second}).DialContext,
+		TLSHandshakeTimeout:   Timeout,
 		ResponseHeaderTimeout: Timeout,
 	}
 	client := &http.Client{

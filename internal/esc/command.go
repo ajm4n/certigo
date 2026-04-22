@@ -201,7 +201,7 @@ func authFlagStr(ctx *ExploitContext) string {
 }
 
 // shellQuote wraps s in single quotes, escaping any embedded single quotes
-// via the standard `'\''` pattern so the output can be pasted directly
+// via the standard `'\”` pattern so the output can be pasted directly
 // into a POSIX shell.
 func shellQuote(s string) string {
 	if s == "" {

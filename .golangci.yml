@@ -23,6 +23,12 @@ linters:
         text: "SA1019.*md4"
         linters:
           - staticcheck
+      # Interactive REPL: stdout/stderr write errors have no useful
+      # recovery path, and wrapping every print in `_, _ = ...` buys
+      # nothing. Suppress errcheck for the shell file specifically.
+      - path: internal/ldap/shell\.go
+        linters:
+          - errcheck
 
 formatters:
   enable:

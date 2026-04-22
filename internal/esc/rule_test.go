@@ -431,7 +431,7 @@ func TestScan_DedupesCALevelFindings(t *testing.T) {
 
 	esc11On1 := findingByESC(t, tpl1.Findings, "ESC11") != nil
 	esc11On2 := findingByESC(t, tpl2.Findings, "ESC11") != nil
-	if !(esc11On1 != esc11On2) {
+	if esc11On1 == esc11On2 {
 		t.Errorf("ESC11 should attach to exactly one template, got tpl1=%v tpl2=%v",
 			esc11On1, esc11On2)
 	}
