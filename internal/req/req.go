@@ -57,6 +57,7 @@ type Options struct {
 	Username    string // HTTP Basic user (domain\user or user@realm)
 	Password    string // plaintext
 	TLSInsecure bool
+	DCHost      string // optional; used as DNS resolver fallback for CA hostnames
 }
 
 // Submit generates a key + CSR, submits via the chosen method, and returns

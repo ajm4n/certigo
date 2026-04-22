@@ -77,11 +77,23 @@ func submitDCOM(opts Options) (*pki.Certificate, error) {
 	)
 
 	progf("[*]", "dcom: dialing %s:135 for IActivation", opts.CA)
-	scmConn, err := dcerpc.Dial(ctx, net.JoinHostPort(opts.CA, "135"),
+	caHost := opts.CA
+	scmConn, err := dcerpc.Dial(ctx, net.JoinHostPort(caHost, "135"),
 		dcerpc.WithTimeout(Timeout),
 		dcerpc.WithSign(),
 		dcerpc.WithMechanism(ssp.NTLM),
 	)
+	if err != nil && opts.DCHost != "" && isDNSError(err) {
+		if resolved, rerr := resolveWithDC(ctx, caHost, opts.DCHost, Timeout); rerr == nil && resolved != caHost {
+			progf("[*]", "dcom: local DNS missed %s; resolved via DC to %s", caHost, resolved)
+			caHost = resolved
+			scmConn, err = dcerpc.Dial(ctx, net.JoinHostPort(caHost, "135"),
+				dcerpc.WithTimeout(Timeout),
+				dcerpc.WithSign(),
+				dcerpc.WithMechanism(ssp.NTLM),
+			)
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("req: dcom: dial %s:135: %w", opts.CA, err)
 	}

@@ -15,23 +15,24 @@ import (
 )
 
 type reqFlags struct {
-	ca           string
-	caName       string
-	template     string
-	method       string
-	upn          string
-	subject      string
-	dns          []string
-	keySize      int
-	username     string
-	password     string
-	outPFX       string
-	outPass      string
-	insecure     bool
-	autoFallback bool
-	domain       string
-	dcHost       string
-	hashes       string
+	ca             string
+	caName         string
+	template       string
+	method         string
+	upn            string
+	subject        string
+	dns            []string
+	keySize        int
+	username       string
+	password       string
+	hashes         string
+	outPFX         string
+	outPass        string
+	insecure       bool
+	domain         string
+	dcHost         string
+	noAutoFallback bool
+	webOnDenied    bool
 }
 
 func newReqCmd() *cobra.Command {
@@ -39,12 +40,18 @@ func newReqCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "req",
 		Short: "Request a certificate via DCOM, ICPR RPC, or /certsrv/ web enrollment",
+		Long: "By default, req discovers every CA that publishes the template " +
+			"(when --dc-host + --domain are supplied) and tries each in order. " +
+			"If every DCOM attempt fails with ACCESS_DENIED, req automatically " +
+			"falls back to /certsrv/ web enrollment against each CA - that path " +
+			"often succeeds even when the 'Certificate Service DCOM Access' " +
+			"ACL denies the principal. Disable with --no-auto-fallback.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runReq(f)
 		},
 	}
 	fl := cmd.Flags()
-	fl.StringVar(&f.ca, "ca", "", "CA hostname or URL (https:// prefix optional)")
+	fl.StringVar(&f.ca, "ca", "", "CA hostname (https:// prefix optional)")
 	fl.StringVar(&f.caName, "ca-name", "", "Enterprise CA common name")
 	fl.StringVar(&f.template, "template", "User", "certificate template name")
 	fl.StringVar(&f.method, "method", "dcom", "submit method: dcom|rpc|web (dcom matches certipy's default)")
@@ -58,9 +65,10 @@ func newReqCmd() *cobra.Command {
 	fl.StringVar(&f.outPFX, "out", "", "output PFX path (required)")
 	fl.StringVar(&f.outPass, "out-password", "", "output PFX password")
 	fl.BoolVar(&f.insecure, "insecure-tls", false, "skip TLS verify")
-	fl.BoolVar(&f.autoFallback, "auto-fallback", false, "on failure, walk every other CA that publishes --template")
-	fl.StringVarP(&f.domain, "domain", "d", "", "AD domain (required for --auto-fallback)")
-	fl.StringVar(&f.dcHost, "dc-host", "", "domain controller (required for --auto-fallback)")
+	fl.StringVarP(&f.domain, "domain", "d", "", "AD domain (enables CA fallback discovery)")
+	fl.StringVar(&f.dcHost, "dc-host", "", "domain controller (enables CA fallback discovery + DNS resolution)")
+	fl.BoolVar(&f.noAutoFallback, "no-auto-fallback", false, "don't discover other CAs publishing the template")
+	fl.BoolVar(&f.webOnDenied, "web-on-denied", false, "on ACCESS_DENIED from DCOM, retry every CA via /certsrv/ web enrollment")
 	return cmd
 }
 
@@ -71,76 +79,123 @@ func runReq(f *reqFlags) error {
 	req.Debug = globalDebug()
 	req.Timeout = time.Duration(globalTimeout()) * time.Second
 
-	// Ordered list of (ca-host, ca-name) pairs to try. Starts with the
-	// operator's --ca (if given), then any LDAP-discovered fallbacks.
 	type target struct{ host, name string }
 	targets := []target{}
 	if f.ca != "" {
 		targets = append(targets, target{host: f.ca, name: f.caName})
 	}
 
-	if f.autoFallback {
-		if f.dcHost == "" || f.domain == "" {
-			return fmt.Errorf("req: --auto-fallback requires --dc-host and --domain")
-		}
+	canDiscover := f.dcHost != "" && f.domain != ""
+	if !f.noAutoFallback && canDiscover {
 		extras, err := discoverPublishers(f)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "[!] auto-fallback discovery failed: %v\n", err)
 		} else {
 			for _, t := range extras {
 				if t.host == f.ca || (t.name == f.caName && f.caName != "") {
-					continue // already first in list
+					continue
 				}
 				targets = append(targets, target{host: t.host, name: t.name})
 			}
 			_, _ = fmt.Fprintf(os.Stderr, "[*] auto-fallback: %d CAs publish %q\n", len(targets), f.template)
 		}
 	}
-
 	if len(targets) == 0 {
-		return fmt.Errorf("req: --ca required (or --auto-fallback with --dc-host + --domain)")
+		return fmt.Errorf("req: --ca required (or --dc-host + --domain for auto-discovery)")
 	}
 
+	// Pass 1: whatever method the operator picked (dcom by default).
+	seenAccessDenied := false
 	var lastErr error
 	for i, t := range targets {
 		if i > 0 {
 			_, _ = fmt.Fprintf(os.Stderr, "[*] auto-fallback: trying %s (%s)\n", t.name, t.host)
 		}
-		opts := req.Options{
-			Method:      req.Method(f.method),
-			CA:          t.host,
-			CAName:      t.name,
-			Template:    f.template,
-			Subject:     f.subject,
-			UPN:         f.upn,
-			DNSNames:    f.dns,
-			KeySize:     f.keySize,
-			Username:    f.username,
-			Password:    f.password,
-			TLSInsecure: f.insecure,
-		}
-		cert, err := req.Submit(opts)
+		cert, err := req.Submit(buildOpts(f, f.method, t.host, t.name))
 		if err == nil {
-			pfx, perr := pki.SavePFX(cert, f.outPass)
-			if perr != nil {
-				return perr
-			}
-			if werr := writeFile(f.outPFX, pfx); werr != nil {
-				return werr
-			}
-			fmt.Printf("cert issued for %s via %s, saved to %s\n",
-				cert.Cert.Subject.CommonName, t.name, f.outPFX)
-			return nil
+			return savePFX(f, cert, t.name)
 		}
 		_, _ = fmt.Fprintf(os.Stderr, "[!] %s failed: %v\n", t.name, err)
+		if isReqAccessDenied(err) {
+			seenAccessDenied = true
+		}
 		lastErr = err
 	}
-	return fmt.Errorf("req: all %d CA attempts failed; last error: %w", len(targets), lastErr)
+
+	// Pass 2: DCOM ACCESS_DENIED is the local "Certificate Service DCOM
+	// Access" ACL rejecting us. Web enrollment is a different code path
+	// that only checks CA enrollment ACL + IIS auth, so it often works.
+	if f.webOnDenied && seenAccessDenied && f.method != "web" {
+		_, _ = fmt.Fprintf(os.Stderr, "[*] every DCOM attempt hit ACCESS_DENIED; retrying via /certsrv/ web enrollment\n")
+		for _, t := range targets {
+			_, _ = fmt.Fprintf(os.Stderr, "[*] web: trying %s (%s)\n", t.name, t.host)
+			opts := buildOpts(f, "web", t.host, t.name)
+			opts.TLSInsecure = true
+			cert, err := req.Submit(opts)
+			if err == nil {
+				return savePFX(f, cert, t.name+" (web)")
+			}
+			_, _ = fmt.Fprintf(os.Stderr, "[!] %s web failed: %v\n", t.name, err)
+			lastErr = err
+		}
+	}
+
+	return fmt.Errorf("req: every CA attempt failed; last error: %w", lastErr)
+}
+
+func buildOpts(f *reqFlags, method, host, name string) req.Options {
+	return req.Options{
+		Method:      req.Method(method),
+		CA:          host,
+		CAName:      name,
+		Template:    f.template,
+		Subject:     f.subject,
+		UPN:         f.upn,
+		DNSNames:    f.dns,
+		KeySize:     f.keySize,
+		Username:    f.username,
+		Password:    f.password,
+		TLSInsecure: f.insecure,
+		DCHost:      f.dcHost,
+	}
+}
+
+func savePFX(f *reqFlags, cert *pki.Certificate, via string) error {
+	pfx, err := pki.SavePFX(cert, f.outPass)
+	if err != nil {
+		return err
+	}
+	if err := writeFile(f.outPFX, pfx); err != nil {
+		return err
+	}
+	fmt.Printf("cert issued for %s via %s, saved to %s\n",
+		cert.Cert.Subject.CommonName, via, f.outPFX)
+	return nil
+}
+
+// isReqAccessDenied checks an error returned from req.Submit for a DCOM /
+// ACCESS_DENIED signature. Kept here (not in internal/req) so the CLI
+// doesn't need to import private error kinds.
+func isReqAccessDenied(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return (indexOf(s, "ERROR_ACCESS_DENIED") >= 0) ||
+		(indexOf(s, "Access is denied") >= 0) ||
+		(indexOf(s, "0x00000005") >= 0)
+}
+
+func indexOf(s, sub string) int {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return i
+		}
+	}
+	return -1
 }
 
 // discoverPublishers queries AD for every CA that publishes f.template.
-// Results include the operator's already-specified CA (if any) so the
-// caller can de-dup. Order preserved from LDAP.
 func discoverPublishers(f *reqFlags) ([]struct{ host, name string }, error) {
 	creds := &auth.Credentials{
 		Username: f.username,
@@ -184,8 +239,6 @@ func discoverPublishers(f *reqFlags) ([]struct{ host, name string }, error) {
 			continue
 		}
 		for _, t := range ca.Templates {
-			// Template publish entries may be display-name or CN-form; accept
-			// either when they match f.template.
 			if t == f.template {
 				out = append(out, struct{ host, name string }{ca.DNSName, ca.Name})
 				break
