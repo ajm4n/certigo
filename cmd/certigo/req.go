@@ -150,7 +150,7 @@ func runReq(f *reqFlags) error {
 }
 
 func buildOpts(f *reqFlags, method, host, name string) req.Options {
-	return req.Options{
+	o := req.Options{
 		Method:      req.Method(method),
 		CA:          host,
 		CAName:      name,
@@ -161,9 +161,17 @@ func buildOpts(f *reqFlags, method, host, name string) req.Options {
 		KeySize:     f.keySize,
 		Username:    f.username,
 		Password:    f.password,
+		Domain:      f.domain,
 		TLSInsecure: f.insecure,
 		DCHost:      f.dcHost,
 	}
+	// PtH: pull NT hash out of --hashes (LM:NT) so the web flow can use it.
+	if f.hashes != "" {
+		if _, nt, err := auth.ParseHashes(f.hashes); err == nil {
+			o.NTHash = nt
+		}
+	}
+	return o
 }
 
 func savePFX(f *reqFlags, cert *pki.Certificate, via string) error {
