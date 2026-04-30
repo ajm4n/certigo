@@ -67,14 +67,26 @@ func BuildCSR(key crypto.PrivateKey, req NewCSRRequest) ([]byte, error) {
 }
 
 // upnOtherName mirrors the AnotherName SEQUENCE from RFC 5280 with the UPN
-// value wrapped in a [0] EXPLICIT tag (UTF8String).
+// value carried as a [0] EXPLICIT UTF8String.
+//
+// Wire format per MS-ADTS (and what certipy emits):
+//
+//   AnotherName ::= SEQUENCE {
+//     type-id  OBJECT IDENTIFIER,      -- 1.3.6.1.4.1.311.20.2.3
+//     value    [0] EXPLICIT UTF8String -- "user@domain"
+//   }
+//
+// Earlier Go code wrapped the UPN string in an inner SEQUENCE (upnValue)
+// before the explicit tag, producing
+//   AnotherName { OID, [0] EXPLICIT SEQUENCE { UTF8String } }
+// which Windows / certipy refused to parse — `Subject Alternative Name`
+// rendered as raw bytes and PKINIT failed with KRB-ERR-GENERIC because
+// the KDC saw no parseable UPN identity. The string field carries the
+// `utf8` ASN.1 tag directly so the encoded value is just the
+// UTF8String, no inner SEQUENCE.
 type upnOtherName struct {
 	TypeID asn1.ObjectIdentifier
-	Value  upnValue `asn1:"tag:0,explicit"`
-}
-
-type upnValue struct {
-	UPN string `asn1:"utf8"`
+	Value  string `asn1:"tag:0,explicit,utf8"`
 }
 
 // buildSANExtension returns a pkix.Extension holding a SEQUENCE of
@@ -95,7 +107,7 @@ func buildSANExtension(dnsNames, upns []string) (pkix.Extension, error) {
 	for _, upn := range upns {
 		inner, err := asn1.Marshal(upnOtherName{
 			TypeID: oidUPN,
-			Value:  upnValue{UPN: upn},
+			Value:  upn,
 		})
 		if err != nil {
 			return pkix.Extension{}, fmt.Errorf("pki: marshal UPN otherName: %w", err)
