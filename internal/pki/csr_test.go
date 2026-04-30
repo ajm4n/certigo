@@ -126,8 +126,8 @@ func TestBuildCSR_WithUPN(t *testing.T) {
 			if !other.TypeID.Equal(oidUPN) {
 				t.Fatalf("otherName OID = %v, want %v", other.TypeID, oidUPN)
 			}
-			if other.Value.UPN != upn {
-				t.Fatalf("otherName value = %q, want %q", other.Value.UPN, upn)
+			if other.Value != upn {
+				t.Fatalf("otherName value = %q, want %q", other.Value, upn)
 			}
 			sawOtherName = true
 		case 2:

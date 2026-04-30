@@ -1,6 +1,7 @@
 // Package req submits certificate requests to AD CS. Supported methods:
-// HTTP web enrollment (/certsrv/) is implemented end-to-end with Basic auth
-// over TLS; NTLM/Kerberos over HTTP and ICPR RPC are pending.
+// HTTP web enrollment (/certsrv/) is implemented end-to-end with Basic
+// auth + Negotiate/NTLM (including pass-the-hash) and HTTP fallback
+// when HTTPS is unavailable; ICPR RPC and DCOM are also supported.
 package req
 
 import (
@@ -11,6 +12,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -19,6 +21,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/ajm4n/certigo/internal/pki"
@@ -54,8 +57,10 @@ type Options struct {
 	UPN         string
 	DNSNames    []string
 	KeySize     int
-	Username    string // HTTP Basic user (domain\user or user@realm)
-	Password    string // plaintext
+	Username    string // HTTP user (sAMAccountName, or domain\user, or user@realm)
+	Password    string // plaintext password (mutually exclusive with NTHash)
+	NTHash      []byte // 16-byte NT hash for pass-the-hash (web flow: NTLM only)
+	Domain      string // NetBIOS or DNS domain; auto-prefixed onto Username for NTLM
 	TLSInsecure bool
 	DCHost      string // optional; used as DNS resolver fallback for CA hostnames
 }
@@ -127,14 +132,25 @@ func buildCSR(key *rsa.PrivateKey, subject, upn string, dns []string) ([]byte, e
 var reqIDRegexp = regexp.MustCompile(`ReqID=(\d+)`)
 
 // postCertSrv submits to /certsrv/certfnsh.asp and fetches the issued cert.
-// Uses HTTPS with InsecureSkipVerify when TLSInsecure=true. Auth: HTTP Basic
-// with the provided username+password. NTLM/Kerberos-over-HTTP is TODO.
+//
+// Transport selection:
+//   - If opts.CA carries an explicit scheme (http:// or https://) it's used as
+//     given; otherwise we try HTTPS first and on connection refused / dial
+//     failure fall back to HTTP. /certsrv/ is fine over HTTP in lab targets
+//     where IIS doesn't bind 443 (e.g. GOAD).
+//
+// Auth selection:
+//   - The HTTP transport is always wrapped with go-ntlmssp's Negotiator. When
+//     the server responds 401 Negotiate/NTLM, the wrapper handles the
+//     challenge-response. When the server speaks Basic, the wrapper passes
+//     credentials through (AllowBasicAuth). Both modes coexist.
+//   - With opts.NTHash != nil and Password == "", we route through a custom
+//     NTLM round-tripper that calls go-ntlmssp's NewAuthenticateMessage with
+//     PasswordHashed: true (PtH).
+//   - opts.Domain is auto-prefixed onto the username (DOMAIN\user) when the
+//     username is bare — required for NTLM domain accounts.
 func postCertSrv(opts Options, csrDER []byte) (*x509.Certificate, error) {
-	base := opts.CA
-	if !strings.HasPrefix(base, "http") {
-		base = "https://" + base
-	}
-	base = strings.TrimSuffix(base, "/")
+	base, allowFallback := normalizeBase(opts.CA)
 
 	// If the host portion parses as an IP, auto-enable InsecureSkipVerify
 	// because the CA's cert will be for the DNS name, not the IP.
@@ -145,17 +161,64 @@ func postCertSrv(opts Options, csrDER []byte) (*x509.Certificate, error) {
 		}
 	}
 
+	cert, err := tryCertSrv(base, opts, csrDER)
+	if err == nil {
+		return cert, nil
+	}
+	// HTTP fallback: only when caller passed a bare hostname (no explicit
+	// scheme) AND the failure looks like a network/TLS error rather than an
+	// HTTP-level rejection.
+	if allowFallback && isDialOrTLSFailure(err) && strings.HasPrefix(base, "https://") {
+		alt := "http://" + strings.TrimPrefix(base, "https://")
+		progf("[!]", "HTTPS to %s failed (%v); retrying over HTTP", base, err)
+		return tryCertSrv(alt, opts, csrDER)
+	}
+	return nil, err
+}
+
+// normalizeBase strips any trailing slash and returns (canonical base URL,
+// allowFallback). allowFallback is true only when the operator did not give
+// an explicit scheme — then we may try HTTPS first and HTTP second.
+func normalizeBase(ca string) (string, bool) {
+	ca = strings.TrimSuffix(ca, "/")
+	switch {
+	case strings.HasPrefix(ca, "http://"), strings.HasPrefix(ca, "https://"):
+		return ca, false
+	default:
+		return "https://" + ca, true
+	}
+}
+
+// isDialOrTLSFailure returns true when err looks like a transport-layer
+// failure where retrying on a different scheme/port could succeed.
+func isDialOrTLSFailure(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.ECONNRESET) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	s := err.Error()
+	switch {
+	case strings.Contains(s, "connection refused"),
+		strings.Contains(s, "no route to host"),
+		strings.Contains(s, "i/o timeout"),
+		strings.Contains(s, "tls:"),
+		strings.Contains(s, "EOF"),
+		strings.Contains(s, "HTTP response to HTTPS client"),
+		strings.Contains(s, "server gave HTTP response to HTTPS client"):
+		return true
+	}
+	return false
+}
+
+func tryCertSrv(base string, opts Options, csrDER []byte) (*x509.Certificate, error) {
 	progf("[*]", "connecting to %s (timeout %s)", base, Timeout)
-	transport := &http.Transport{
-		TLSClientConfig:       &tls.Config{InsecureSkipVerify: opts.TLSInsecure}, // #nosec G402 - opt-in via --insecure-tls
-		DialContext:           (&net.Dialer{Timeout: Timeout, KeepAlive: 30 * time.Second}).DialContext,
-		TLSHandshakeTimeout:   Timeout,
-		ResponseHeaderTimeout: Timeout,
-	}
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   Timeout * 2,
-	}
+	client := buildHTTPClient(opts)
 
 	// Step 1 - POST /certsrv/certfnsh.asp with the CSR.
 	csrPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrDER})
@@ -173,9 +236,7 @@ func postCertSrv(opts Options, csrDER []byte) (*x509.Certificate, error) {
 	}
 	postReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	postReq.Header.Set("User-Agent", "certigo/0.3")
-	if opts.Username != "" {
-		postReq.SetBasicAuth(opts.Username, opts.Password)
-	}
+	applyAuth(postReq, opts)
 
 	progf("[*]", "POST %s", postURL)
 	resp, err := client.Do(postReq)
@@ -190,6 +251,10 @@ func postCertSrv(opts Options, csrDER []byte) (*x509.Certificate, error) {
 		progf("[debug]", "response body: %s", truncate(string(body), 400))
 	}
 
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, fmt.Errorf("req: certfnsh 401 (auth failed; check creds / NTLM vs Basic): %s",
+			truncate(strings.Join(resp.Header.Values("WWW-Authenticate"), ", "), 200))
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("req: certfnsh status %d: %s", resp.StatusCode, truncate(string(body), 200))
 	}
@@ -203,9 +268,8 @@ func postCertSrv(opts Options, csrDER []byte) (*x509.Certificate, error) {
 	// Step 2 - GET /certsrv/certnew.cer?ReqID=<id>&Enc=b64 for the PEM cert.
 	getURL := fmt.Sprintf("%s/certsrv/certnew.cer?ReqID=%s&Enc=b64", base, reqID)
 	getReq, _ := http.NewRequest("GET", getURL, nil)
-	if opts.Username != "" {
-		getReq.SetBasicAuth(opts.Username, opts.Password)
-	}
+	getReq.Header.Set("User-Agent", "certigo/0.3")
+	applyAuth(getReq, opts)
 	getResp, err := client.Do(getReq)
 	if err != nil {
 		return nil, fmt.Errorf("req: certnew GET: %w", err)
@@ -228,6 +292,54 @@ func postCertSrv(opts Options, csrDER []byte) (*x509.Certificate, error) {
 		}
 	}
 	return x509.ParseCertificate(der)
+}
+
+// buildHTTPClient returns an *http.Client whose RoundTripper handles both
+// Basic and NTLM/Negotiate transparently and supports pass-the-hash via the
+// NTHash field.
+func buildHTTPClient(opts Options) *http.Client {
+	transport := &http.Transport{
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: opts.TLSInsecure}, // #nosec G402 - opt-in via --insecure-tls
+		DialContext:           (&net.Dialer{Timeout: Timeout, KeepAlive: 30 * time.Second}).DialContext,
+		TLSHandshakeTimeout:   Timeout,
+		ResponseHeaderTimeout: Timeout,
+	}
+	rt := wrapNTLMTransport(transport, opts)
+	return &http.Client{Transport: rt, Timeout: Timeout * 2}
+}
+
+// applyAuth attaches credentials to the request. For password mode we call
+// SetBasicAuth so the Negotiator round-tripper can pick them up; for hash
+// mode we stash the username via SetBasicAuth (with sentinel password) so
+// the PtH wrapper recognizes the request.
+func applyAuth(req *http.Request, opts Options) {
+	user := formatNTLMUser(opts.Username, opts.Domain)
+	if user == "" {
+		return
+	}
+	if len(opts.NTHash) > 0 {
+		// Sentinel password: empty string. The PtH wrapper detects this
+		// based on its own state (it carries the hash out-of-band).
+		req.SetBasicAuth(user, "")
+		return
+	}
+	req.SetBasicAuth(user, opts.Password)
+}
+
+// formatNTLMUser prefixes Domain onto Username unless Username already
+// contains a delimiter (\ or @).
+func formatNTLMUser(user, domain string) string {
+	user = strings.TrimSpace(user)
+	if user == "" {
+		return ""
+	}
+	if domain == "" {
+		return user
+	}
+	if strings.Contains(user, "\\") || strings.Contains(user, "@") {
+		return user
+	}
+	return domain + "\\" + user
 }
 
 func truncate(s string, n int) string {

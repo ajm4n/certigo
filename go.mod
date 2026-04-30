@@ -3,6 +3,7 @@ module github.com/ajm4n/certigo
 go 1.24.1
 
 require (
+	github.com/Azure/go-ntlmssp v0.1.0
 	github.com/go-ldap/ldap/v3 v3.4.13
 	github.com/google/uuid v1.6.0
 	github.com/jcmturner/gofork v1.7.6
@@ -14,7 +15,6 @@ require (
 )
 
 require (
-	github.com/Azure/go-ntlmssp v0.1.0 // indirect
 	github.com/alexbrainman/sspi v0.0.0-20250919150558-7d374ff0d59e // indirect
 	github.com/geoffgarside/ber v1.1.0 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.8-0.20250403174932-29230038a667 // indirect
